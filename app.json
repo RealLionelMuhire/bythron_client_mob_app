@@ -32,6 +32,13 @@
         {
           "origin": "https://uber.dev/"
         }
+      ],
+      [
+        "@rnmapbox/maps",
+        {
+          "RNMapboxMapsDownloadToken": "YOUR_MAPBOX_TOKEN_HERE",
+          "RNMapboxMapsImpl": "mapbox"
+        }
       ]
     ],
     "experiments": {

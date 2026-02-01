@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-import { DriverStore, LocationStore, MarkerData } from "@/types/type";
+import { DeviceStore, LocationStore, Device, Location, HistoricalRoute } from "@/types/type";
 
 export const useLocationStore = create<LocationStore>((set) => ({
   userLatitude: null,
@@ -24,9 +24,9 @@ export const useLocationStore = create<LocationStore>((set) => ({
       userAddress: address,
     }));
 
-    // if driver is selected and now new location is set, clear the selected driver
-    const { selectedDriver, clearSelectedDriver } = useDriverStore.getState();
-    if (selectedDriver) clearSelectedDriver();
+    // if device is selected and now new location is set, clear the selected device
+    const { selectedDevice, clearSelectedDevice } = useDeviceStore.getState();
+    if (selectedDevice) clearSelectedDevice();
   },
 
   setDestinationLocation: ({
@@ -44,17 +44,23 @@ export const useLocationStore = create<LocationStore>((set) => ({
       destinationAddress: address,
     }));
 
-    // if driver is selected and now new location is set, clear the selected driver
-    const { selectedDriver, clearSelectedDriver } = useDriverStore.getState();
-    if (selectedDriver) clearSelectedDriver();
+    // if device is selected and now new location is set, clear the selected device
+    const { selectedDevice, clearSelectedDevice } = useDeviceStore.getState();
+    if (selectedDevice) clearSelectedDevice();
   },
 }));
 
-export const useDriverStore = create<DriverStore>((set) => ({
-  drivers: [] as MarkerData[],
-  selectedDriver: null,
-  setSelectedDriver: (driverId: number) =>
-    set(() => ({ selectedDriver: driverId })),
-  setDrivers: (drivers: MarkerData[]) => set(() => ({ drivers })),
-  clearSelectedDriver: () => set(() => ({ selectedDriver: null })),
+export const useDeviceStore = create<DeviceStore>((set) => ({
+  devices: [] as Device[],
+  selectedDevice: null,
+  currentLocation: null,
+  historicalRoute: null,
+  isLoadingLocation: false,
+  setSelectedDevice: (deviceId: number) =>
+    set(() => ({ selectedDevice: deviceId })),
+  setDevices: (devices: Device[]) => set(() => ({ devices })),
+  clearSelectedDevice: () => set(() => ({ selectedDevice: null })),
+  setCurrentLocation: (location: Location) => set(() => ({ currentLocation: location })),
+  setHistoricalRoute: (route: HistoricalRoute | null) => set(() => ({ historicalRoute: route })),
+  setLoadingLocation: (loading: boolean) => set(() => ({ isLoadingLocation: loading })),
 }));

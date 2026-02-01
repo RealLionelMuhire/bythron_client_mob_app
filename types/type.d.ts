@@ -1,13 +1,23 @@
 import { TextInputProps, TouchableOpacityProps } from "react-native";
 
-declare interface Driver {
+declare interface Device {
   id: number;
-  first_name: string;
-  last_name: string;
-  profile_image_url: string;
-  car_image_url: string;
-  car_seats: number;
-  rating: number;
+  name: string;
+  vehicle_info?: string;
+  status: 'online' | 'offline';
+  last_seen: string;
+  imei?: string;
+}
+
+declare interface Location {
+  id: number;
+  device_id: number;
+  latitude: number;
+  longitude: number;
+  altitude?: number;
+  speed?: number;
+  course?: number;
+  timestamp: string;
 }
 
 declare interface MarkerData {
@@ -15,14 +25,9 @@ declare interface MarkerData {
   longitude: number;
   id: number;
   title: string;
-  profile_image_url: string;
-  car_image_url: string;
-  car_seats: number;
-  rating: number;
-  first_name: string;
-  last_name: string;
-  time?: number;
-  price?: string;
+  course?: number;
+  speed?: number;
+  status?: 'online' | 'offline';
 }
 
 declare interface MapProps {
@@ -33,24 +38,23 @@ declare interface MapProps {
   onMapReady?: () => void;
 }
 
-declare interface Ride {
-  origin_address: string;
-  destination_address: string;
-  origin_latitude: number;
-  origin_longitude: number;
-  destination_latitude: number;
-  destination_longitude: number;
-  ride_time: number;
-  fare_price: number;
-  payment_status: string;
-  driver_id: number;
-  user_id: string;
-  created_at: string;
-  driver: {
-    first_name: string;
-    last_name: string;
-    car_seats: number;
-  };
+declare interface RouteData {
+  type: 'FeatureCollection';
+  features: {
+    type: 'Feature';
+    geometry: {
+      type: 'LineString';
+      coordinates: number[][];
+    };
+    properties: any;
+  }[];
+}
+
+declare interface HistoricalRoute {
+  device_id: number;
+  start_time: string;
+  end_time: string;
+  route: RouteData;
 }
 
 declare interface ButtonProps extends TouchableOpacityProps {
@@ -62,21 +66,7 @@ declare interface ButtonProps extends TouchableOpacityProps {
   className?: string;
 }
 
-declare interface GoogleInputProps {
-  icon?: string;
-  initialLocation?: string;
-  containerStyle?: string;
-  textInputBackgroundColor?: string;
-  handlePress: ({
-    latitude,
-    longitude,
-    address,
-  }: {
-    latitude: number;
-    longitude: number;
-    address: string;
-  }) => void;
-}
+
 
 declare interface InputFieldProps extends TextInputProps {
   label: string;
@@ -89,13 +79,7 @@ declare interface InputFieldProps extends TextInputProps {
   className?: string;
 }
 
-declare interface PaymentProps {
-  fullName: string;
-  email: string;
-  amount: string;
-  driverId: number;
-  rideTime: number;
-}
+
 
 declare interface LocationStore {
   userLatitude: number | null;
@@ -124,16 +108,23 @@ declare interface LocationStore {
   }) => void;
 }
 
-declare interface DriverStore {
-  drivers: MarkerData[];
-  selectedDriver: number | null;
-  setSelectedDriver: (driverId: number) => void;
-  setDrivers: (drivers: MarkerData[]) => void;
-  clearSelectedDriver: () => void;
+declare interface DeviceStore {
+  devices: Device[];
+  selectedDevice: number | null;
+  currentLocation: Location | null;
+  historicalRoute: HistoricalRoute | null;
+  isLoadingLocation: boolean;
+  setSelectedDevice: (deviceId: number) => void;
+  setDevices: (devices: Device[]) => void;
+  clearSelectedDevice: () => void;
+  setCurrentLocation: (location: Location) => void;
+  setHistoricalRoute: (route: HistoricalRoute | null) => void;
+  setLoadingLocation: (loading: boolean) => void;
 }
 
-declare interface DriverCardProps {
-  item: MarkerData;
-  selected: number;
+declare interface DeviceCardProps {
+  item: Device;
+  selected: number | null;
   setSelected: () => void;
+  onHistoryPress?: () => void;
 }
