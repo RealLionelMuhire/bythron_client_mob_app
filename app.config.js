@@ -13,12 +13,14 @@ module.exports = {
       backgroundColor: "#2F80ED",
     },
     ios: {
+      bundleIdentifier: "com.bythron.gpstracker",
       supportsTablet: true,
       infoPlist: {
         MGLMapboxAccessToken: process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN || "",
       },
     },
     android: {
+      package: "com.bythron.gpstracker",
       adaptiveIcon: {
         foregroundImage: "./assets/images/adaptive-icon.png",
         backgroundColor: "#ffffff",
@@ -31,6 +33,13 @@ module.exports = {
     },
     plugins: [
       "expo-router",
+      [
+        "@rnmapbox/maps",
+        {
+          RNMapboxMapsDownloadToken: process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN || "",
+          RNMapboxMapsImpl: "mapbox",
+        },
+      ],
     ],
     experiments: {
       typedRoutes: true,

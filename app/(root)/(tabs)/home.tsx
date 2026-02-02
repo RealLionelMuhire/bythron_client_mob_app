@@ -11,7 +11,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
+import SimpleBottomSheet, { BottomSheetView } from "@/components/SimpleBottomSheet";
 
 import Map from "@/components/Map";
 import DeviceCard from "@/components/DeviceCard";
@@ -35,7 +35,7 @@ const Home = () => {
     setCurrentLocation
   } = useDeviceStore();
 
-  const bottomSheetRef = useRef<BottomSheet>(null);
+  const bottomSheetRef = useRef<any>(null);
   const [showHistory, setShowHistory] = useState(false);
 
   // Sync user to backend on load
@@ -129,7 +129,7 @@ const Home = () => {
 
         <Map />
 
-        <BottomSheet
+        <SimpleBottomSheet
           ref={bottomSheetRef}
           snapPoints={["40%", "85%"]}
           index={0}
@@ -181,7 +181,7 @@ const Home = () => {
               </>
             )}
           </BottomSheetView>
-        </BottomSheet>
+        </SimpleBottomSheet>
       </View>
     </SafeAreaView>
   );

@@ -3,6 +3,7 @@
     "name": "uber",
     "slug": "uber",
     "version": "1.0.0",
+    "sdkVersion": "54.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "myapp",
@@ -13,9 +14,11 @@
       "backgroundColor": "#2F80ED"
     },
     "ios": {
+      "bundleIdentifier": "com.bythron.gpstracker",
       "supportsTablet": true
     },
     "android": {
+      "package": "com.bythron.gpstracker",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
