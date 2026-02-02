@@ -28,10 +28,7 @@
     },
     "plugins": [
       [
-        "expo-router",
-        {
-          "origin": "https://uber.dev/"
-        }
+        "expo-router"
       ],
       [
         "@rnmapbox/maps",
