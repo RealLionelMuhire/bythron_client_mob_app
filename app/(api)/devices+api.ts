@@ -9,7 +9,7 @@ export async function GET(request: Request) {
             );
         }
 
-        const response = await fetch(`${apiBaseUrl}/api/devices`, {
+        const response = await fetch(`${apiBaseUrl}/api/devices/`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',

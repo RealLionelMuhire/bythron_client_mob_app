@@ -19,7 +19,7 @@ export async function POST(request: Request) {
             );
         }
 
-        const response = await fetch(`${apiBaseUrl}/api/auth/sync`, {
+        const response = await fetch(`${apiBaseUrl}/api/auth/sync/`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
