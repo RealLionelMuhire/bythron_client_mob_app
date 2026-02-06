@@ -1,8 +1,9 @@
 import { useSignUp } from "@clerk/clerk-expo";
-import { Link, router } from "expo-router";
+import { Link, router, Redirect } from "expo-router";
 import { useState } from "react";
 import { Alert, Image, ScrollView, Text, View } from "react-native";
 import { ReactNativeModal } from "react-native-modal";
+import { useAuth } from "@clerk/clerk-expo";
 
 import CustomButton from "@/components/CustomButton";
 import InputField from "@/components/InputField";
@@ -12,6 +13,7 @@ import { fetchAPI } from "@/lib/fetch";
 
 const SignUp = () => {
   const { isLoaded, signUp, setActive } = useSignUp();
+  const { isSignedIn } = useAuth();
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const [form, setForm] = useState({
@@ -24,6 +26,11 @@ const SignUp = () => {
     error: "",
     code: "",
   });
+
+  // Redirect if already signed in
+  if (isSignedIn) {
+    return <Redirect href="/(root)/(tabs)/home" />;
+  }
 
   const onSignUpPress = async () => {
     if (!isLoaded) return;

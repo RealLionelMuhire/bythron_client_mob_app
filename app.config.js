@@ -7,6 +7,11 @@ module.exports = {
     icon: "./assets/images/icon.png",
     scheme: "myapp",
     userInterfaceStyle: "automatic",
+    extra: {
+      eas: {
+        projectId: "58a5178d-4c52-479c-8407-044ddd9c49da"
+      }
+    },
     splash: {
       image: "./assets/images/splash.png",
       resizeMode: "contain",
@@ -36,7 +41,6 @@ module.exports = {
       [
         "@rnmapbox/maps",
         {
-          RNMapboxMapsDownloadToken: process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN || "",
           RNMapboxMapsImpl: "mapbox",
         },
       ],

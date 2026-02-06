@@ -1,7 +1,8 @@
 import { useSignIn } from "@clerk/clerk-expo";
-import { Link, router } from "expo-router";
+import { Link, router, Redirect } from "expo-router";
 import { useCallback, useState } from "react";
 import { Alert, Image, ScrollView, Text, View } from "react-native";
+import { useAuth } from "@clerk/clerk-expo";
 
 import CustomButton from "@/components/CustomButton";
 import InputField from "@/components/InputField";
@@ -10,11 +11,17 @@ import { icons, images } from "@/constants";
 
 const SignIn = () => {
   const { signIn, setActive, isLoaded } = useSignIn();
+  const { isSignedIn } = useAuth();
 
   const [form, setForm] = useState({
     email: "",
     password: "",
   });
+
+  // Redirect if already signed in
+  if (isSignedIn) {
+    return <Redirect href="/(root)/(tabs)/home" />;
+  }
 
   const onSignInPress = useCallback(async () => {
     if (!isLoaded) return;
