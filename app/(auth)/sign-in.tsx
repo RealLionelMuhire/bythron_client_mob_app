@@ -17,6 +17,9 @@ const SignIn = () => {
     email: "",
     password: "",
   });
+  
+  const [pendingVerification, setPendingVerification] = useState(false);
+  const [code, setCode] = useState("");
 
   // Redirect if already signed in
   if (isSignedIn) {
@@ -35,6 +38,25 @@ const SignIn = () => {
       if (signInAttempt.status === "complete") {
         await setActive({ session: signInAttempt.createdSessionId });
         router.replace("/(root)/(tabs)/home");
+      } else if (signInAttempt.status === "needs_second_factor") {
+        // Two-factor authentication is required
+        // Prepare the email code to be sent
+        const emailCodeFactor = signInAttempt.supportedSecondFactors?.find(
+          (factor: any) => factor.strategy === "email_code"
+        );
+        
+        if (emailCodeFactor) {
+          await signInAttempt.prepareSecondFactor({
+            strategy: "email_code",
+            emailAddressId: emailCodeFactor.emailAddressId,
+          });
+          
+          setPendingVerification(true);
+          Alert.alert(
+            "Verification Required",
+            `A verification code has been sent to ${emailCodeFactor.safeIdentifier}`
+          );
+        }
       } else {
         // See https://clerk.com/docs/custom-flows/error-handling for more info on error handling
         console.log(JSON.stringify(signInAttempt, null, 2));
@@ -45,6 +67,28 @@ const SignIn = () => {
       Alert.alert("Error", err.errors[0].longMessage);
     }
   }, [isLoaded, form]);
+
+  const onVerifyPress = useCallback(async () => {
+    if (!isLoaded) return;
+
+    try {
+      const signInAttempt = await signIn.attemptSecondFactor({
+        strategy: "email_code",
+        code,
+      });
+
+      if (signInAttempt.status === "complete") {
+        await setActive({ session: signInAttempt.createdSessionId });
+        router.replace("/(root)/(tabs)/home");
+      } else {
+        console.log(JSON.stringify(signInAttempt, null, 2));
+        Alert.alert("Error", "Verification failed. Please try again.");
+      }
+    } catch (err: any) {
+      console.log(JSON.stringify(err, null, 2));
+      Alert.alert("Error", err.errors?.[0]?.longMessage || "Verification failed");
+    }
+  }, [isLoaded, code]);
 
   return (
     <ScrollView className="flex-1 bg-white">
@@ -57,40 +101,78 @@ const SignIn = () => {
         </View>
 
         <View className="p-5">
-          <InputField
-            label="Email"
-            placeholder="Enter email"
-            icon={icons.email}
-            textContentType="emailAddress"
-            value={form.email}
-            onChangeText={(value) => setForm({ ...form, email: value })}
-          />
+          {!pendingVerification ? (
+            <>
+              <InputField
+                label="Email"
+                placeholder="Enter email"
+                icon={icons.email}
+                textContentType="emailAddress"
+                value={form.email}
+                onChangeText={(value) => setForm({ ...form, email: value })}
+              />
 
-          <InputField
-            label="Password"
-            placeholder="Enter password"
-            icon={icons.lock}
-            secureTextEntry={true}
-            textContentType="password"
-            value={form.password}
-            onChangeText={(value) => setForm({ ...form, password: value })}
-          />
+              <InputField
+                label="Password"
+                placeholder="Enter password"
+                icon={icons.lock}
+                secureTextEntry={true}
+                textContentType="password"
+                value={form.password}
+                onChangeText={(value) => setForm({ ...form, password: value })}
+              />
 
-          <CustomButton
-            title="Sign In"
-            onPress={onSignInPress}
-            className="mt-6"
-          />
+              <CustomButton
+                title="Sign In"
+                onPress={onSignInPress}
+                className="mt-6"
+              />
 
-          <OAuth />
+              <OAuth />
 
-          <Link
-            href="/sign-up"
-            className="text-lg text-center text-general-200 mt-10"
-          >
-            Don't have an account?{" "}
-            <Text className="text-primary-500">Sign Up</Text>
-          </Link>
+              <Link
+                href="/sign-up"
+                className="text-lg text-center text-general-200 mt-10"
+              >
+                Don't have an account?{" "}
+                <Text className="text-primary-500">Sign Up</Text>
+              </Link>
+            </>
+          ) : (
+            <>
+              <Text className="text-2xl font-JakartaBold mb-2">
+                Verify Your Email
+              </Text>
+              <Text className="text-base text-general-200 mb-5">
+                Enter the verification code sent to your email
+              </Text>
+
+              <InputField
+                label="Verification Code"
+                placeholder="Enter code"
+                icon={icons.lock}
+                value={code}
+                keyboardType="number-pad"
+                onChangeText={setCode}
+              />
+
+              <CustomButton
+                title="Verify Email"
+                onPress={onVerifyPress}
+                className="mt-6"
+              />
+
+              <CustomButton
+                title="Back to Sign In"
+                onPress={() => {
+                  setPendingVerification(false);
+                  setCode("");
+                }}
+                className="mt-2"
+                bgVariant="outline"
+              />
+            </>
+          )}
         </View>
       </View>
     </ScrollView>
