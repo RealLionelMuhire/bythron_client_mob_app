@@ -39,15 +39,13 @@ export default function RootLayout() {
     }
   }, [loaded]);
 
-  if (!loaded) {
-    return null;
-  }
-
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <ClerkProvider tokenCache={tokenCache} publishableKey={publishableKey}>
-        <Slot />
-      </ClerkProvider>
+      {!loaded ? null : (
+        <ClerkProvider tokenCache={tokenCache} publishableKey={publishableKey}>
+          <Slot />
+        </ClerkProvider>
+      )}
     </GestureHandlerRootView>
   );
 }
