@@ -21,11 +21,6 @@ const SignIn = () => {
   const [pendingVerification, setPendingVerification] = useState(false);
   const [code, setCode] = useState("");
 
-  // Redirect if already signed in
-  if (isSignedIn) {
-    return <Redirect href="/(root)/(tabs)/home" />;
-  }
-
   const onSignInPress = useCallback(async () => {
     if (!isLoaded) return;
 
@@ -89,6 +84,11 @@ const SignIn = () => {
       Alert.alert("Error", err.errors?.[0]?.longMessage || "Verification failed");
     }
   }, [isLoaded, code]);
+
+  // Redirect if already signed in (after all hooks)
+  if (isSignedIn) {
+    return <Redirect href="/(root)/(tabs)/home" />;
+  }
 
   return (
     <ScrollView className="flex-1 bg-white">

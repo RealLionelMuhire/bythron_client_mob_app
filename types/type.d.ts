@@ -7,6 +7,7 @@ declare interface Device {
   status: 'online' | 'offline';
   last_seen: string;
   imei?: string;
+  speed?: number;
 }
 
 declare interface Location {
