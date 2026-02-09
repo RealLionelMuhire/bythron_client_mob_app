@@ -60,3 +60,4 @@ expo-env.d.ts
 
 # env
 .env
+eas.json

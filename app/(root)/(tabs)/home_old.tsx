@@ -17,6 +17,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Map from "@/components/Map";
 import DeviceCard from "@/components/DeviceCard";
 import HistorySheet from "@/components/HistorySheet";
+import SimpleBottomSheet, { BottomSheetView } from "@/components/SimpleBottomSheet";
 import { icons } from "@/constants";
 import { useFetch } from "@/lib/fetch";
 import { useLocationStore, useDeviceStore } from "@/store";
@@ -40,6 +41,8 @@ const Home = () => {
 
   const [activeTab, setActiveTab] = useState<TabType>("devices");
   const [selectedHistoryDate, setSelectedHistoryDate] = useState<Date | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const bottomSheetRef = useRef<any>(null);
 
   // Sync user to backend on load
   useEffect(() => {

@@ -9,6 +9,11 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_Y2xvc2luZy1vd2wtNjcuY2xlcmsuYWNjb3VudHMuZGV2JA",
+        "EXPO_PUBLIC_API_BASE_URL": "http://164.92.212.186:8000",
+        "EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN": "pk.eyJ1IjoibXVoaXJlMDEiLCJhIjoiY21sNDlxcGFmMTJ5czNmc2Q0eGR0N2w1aCJ9.vCQM9Ex_LwwJfXa00-9xwg"
       }
     },
     "development-simulator": {

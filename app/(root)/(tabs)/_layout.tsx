@@ -1,85 +1,108 @@
 import { Tabs } from "expo-router";
-import { Image, ImageSourcePropType, View } from "react-native";
-
-import { icons } from "@/constants";
-
-const TabIcon = ({
-  source,
-  focused,
-}: {
-  source: ImageSourcePropType;
-  focused: boolean;
-}) => (
-  <View
-    className={`flex flex-row justify-center items-center rounded-full ${focused ? "bg-general-300" : ""}`}
-  >
-    <View
-      className={`rounded-full w-12 h-12 items-center justify-center ${focused ? "bg-general-400" : ""}`}
-    >
-      <Image
-        source={source}
-        tintColor="white"
-        resizeMode="contain"
-        className="w-7 h-7"
-      />
-    </View>
-  </View>
-);
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 
 export default function Layout() {
   return (
     <Tabs
-      initialRouteName="home"
+      initialRouteName="alerts"
       screenOptions={{
         tabBarActiveTintColor: "white",
-        tabBarInactiveTintColor: "white",
-        tabBarShowLabel: false,
-        tabBarStyle: {
-          backgroundColor: "#333333",
-          borderRadius: 50,
-          paddingBottom: 0, // ios only
-          overflow: "hidden",
-          marginHorizontal: 20,
-          marginBottom: 20,
-          height: 78,
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          flexDirection: "row",
-          position: "absolute",
+        tabBarInactiveTintColor: "#A8D8F0",
+        tabBarShowLabel: true,
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: "600",
+          marginBottom: 6,
         },
+        tabBarIconStyle: {
+          marginTop: 6,
+        },
+        tabBarStyle: {
+          backgroundColor: "rgba(26, 42, 58, 0.95)",
+          borderTopWidth: 1,
+          borderTopColor: "#5BB8E8",
+          height: 80,
+          paddingTop: 4,
+          position: "absolute",
+          left: 0,
+          right: 0,
+          bottom: 0,
+        },
+        headerShown: false,
       }}
     >
       <Tabs.Screen
-        name="home"
+        name="home_old"
         options={{
           title: "Home",
-          headerShown: false,
-          tabBarIcon: ({ focused }) => (
-            <TabIcon source={icons.home} focused={focused} />
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="home" size={size} color={color} />
           ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="history"
+        options={{
+          title: "History",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="time-outline" size={size} color={color} />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="command"
+        options={{
+          title: "Command",
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons
+              name="swap-horizontal"
+              size={size}
+              color={color}
+            />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="alerts"
+        options={{
+          title: "Alerts",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="notifications" size={size} color={color} />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: "Settings",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="settings-outline" size={size} color={color} />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="home"
+        options={{
+          href: null,
         }}
       />
 
       <Tabs.Screen
         name="tracking"
         options={{
-          title: "Tracking",
-          headerShown: false,
-          tabBarIcon: ({ focused }) => (
-            <TabIcon source={icons.map} focused={focused} />
-          ),
+          href: null,
         }}
       />
 
       <Tabs.Screen
         name="profile"
         options={{
-          title: "Profile",
-          headerShown: false,
-          tabBarIcon: ({ focused }) => (
-            <TabIcon source={icons.profile} focused={focused} />
-          ),
+          href: null,
         }}
       />
     </Tabs>

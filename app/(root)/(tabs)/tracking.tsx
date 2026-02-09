@@ -22,9 +22,9 @@ const Speedometer = ({ speed = 0, maxSpeed = 200 }: { speed: number; maxSpeed?: 
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
 
-  // Speed arc (goes from -135° to 135° = 270° total)
-  const startAngle = -135;
-  const endAngle = 135;
+  // Speed arc (half circle)
+  const startAngle = -180;
+  const endAngle = 0;
   const totalAngle = endAngle - startAngle;
   
   // Calculate needle angle based on speed
@@ -129,7 +129,7 @@ const Tracking = () => {
   const speed = device?.speed || 9;
   const totalDistance = 83337.62; // This would come from device data
   const status = device?.status === "online" ? "Moving" : "Stopped";
-  const address = "Worldclasseducations, 308th Rd, Sheikh Zayed Rd, Rd, Dubai, UAE.";
+  const address = "Sheikh Zayed Rd";
 
   // Format time ago
   const formatTimeAgo = (date?: string) => {
@@ -186,14 +186,14 @@ const Tracking = () => {
             <View style={styles.iconButton}>
               <Ionicons name="battery-half" size={20} color="#5BB8E8" />
               <Text style={styles.iconLabel}>Battery</Text>
-            </View>
-            <View style={styles.iconButton}>
-              <MaterialCommunityIcons name="wifi" size={20} color="#5BB8E8" />
-              <Text style={styles.iconLabel}>Wi/ebites</Text>
+              <Text style={styles.iconStatus}>0%</Text>
             </View>
             <View style={styles.iconButton}>
               <MaterialCommunityIcons name="key" size={20} color="#5BB8E8" />
               <Text style={styles.iconLabel}>Ignition</Text>
+              <Text style={styles.iconStatus}>
+                {device?.status === "online" ? "On" : "Off"}
+              </Text>
             </View>
           </View>
 
@@ -236,7 +236,8 @@ const Tracking = () => {
 
         {/* Address Bar */}
         <View style={styles.addressBar}>
-          <Ionicons name="location" size={20} color="#5BB8E8" />
+          <Ionicons name="location" size={18} color="#5BB8E8" />
+          <MaterialCommunityIcons name="road-variant" size={16} color="#5BB8E8" />
           <Text style={styles.addressText} numberOfLines={2}>
             {address}
           </Text>
@@ -310,28 +311,6 @@ const Tracking = () => {
           <Ionicons name="ellipsis-vertical" size={24} color="white" />
         </TouchableOpacity>
 
-        {/* Bottom Navigation */}
-        <View style={styles.bottomNav}>
-          <TouchableOpacity style={styles.navButton}>
-            <Ionicons name="time-outline" size={28} color="#A8D8F0" />
-            <Text style={styles.navText}>History</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.navButton}>
-            <MaterialCommunityIcons name="swap-horizontal" size={28} color="#A8D8F0" />
-            <Text style={styles.navText}>Command</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={[styles.navButton, styles.navButtonActive]}>
-            <Ionicons name="notifications" size={28} color="white" />
-            <Text style={[styles.navText, styles.navTextActive]}>Alerts</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.navButton}>
-            <Ionicons name="settings-outline" size={28} color="#A8D8F0" />
-            <Text style={styles.navText}>Settings</Text>
-          </TouchableOpacity>
-        </View>
       </View>
     </View>
   );
@@ -344,7 +323,7 @@ const styles = StyleSheet.create({
   },
   statusBarBg: {
     height: 50,
-    backgroundColor: "#5BB8E8",
+    backgroundColor: "#E04848",
     opacity: 0.8,
   },
   infoContainer: {
@@ -359,7 +338,7 @@ const styles = StyleSheet.create({
   },
   iconButton: {
     alignItems: "center",
-    marginBottom: 15,
+    marginBottom: 8,
   },
   iconLabel: {
     fontSize: 9,
@@ -367,34 +346,42 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontWeight: "600",
   },
+  iconStatus: {
+    fontSize: 9,
+    color: "white",
+    marginTop: 1,
+    fontWeight: "600",
+  },
   speedometerContainer: {
     flex: 1,
     alignItems: "center",
-    paddingTop: 5,
+    paddingTop: 0,
+    marginTop: -6,
   },
   totalDistance: {
     fontSize: 18,
     fontWeight: "bold",
     color: "white",
-    marginTop: 5,
+    marginTop: -4,
   },
   currentSpeed: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: "bold",
-    color: "#5BB8E8",
-    marginTop: 2,
+    color: "white",
+    marginTop: -6,
   },
   rightInfo: {
-    width: 120,
-    justifyContent: "space-around",
+    width: 100,
+    justifyContent: "flex-start",
+    gap: 4,
   },
   statusCard: {
     backgroundColor: "rgba(30, 58, 82, 0.6)",
     borderRadius: 8,
-    padding: 8,
+    padding: 6,
     borderWidth: 1,
     borderColor: "#5BB8E8",
-    marginBottom: 8,
+    marginBottom: 2,
   },
   statusHeader: {
     flexDirection: "row",
@@ -403,22 +390,22 @@ const styles = StyleSheet.create({
   },
   statusText: {
     color: "#5BB8E8",
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: "600",
   },
   statusLabel: {
     color: "white",
-    fontSize: 16,
+    fontSize: 12,
     fontWeight: "bold",
     marginTop: 4,
   },
   infoCard: {
     backgroundColor: "rgba(30, 58, 82, 0.6)",
     borderRadius: 8,
-    padding: 8,
+    padding: 6,
     borderWidth: 1,
     borderColor: "#5BB8E8",
-    marginBottom: 8,
+    marginBottom: 2,
   },
   infoRow: {
     flexDirection: "row",
@@ -427,17 +414,17 @@ const styles = StyleSheet.create({
   },
   infoDate: {
     color: "white",
-    fontSize: 11,
+    fontSize: 9,
     fontWeight: "600",
   },
   infoLabel: {
     color: "#A8D8F0",
-    fontSize: 10,
+    fontSize: 9,
     marginTop: 2,
   },
   infoTime: {
     color: "white",
-    fontSize: 11,
+    fontSize: 9,
     fontWeight: "600",
     marginTop: 2,
   },
@@ -446,18 +433,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(30, 58, 82, 0.8)",
     borderRadius: 12,
-    padding: 12,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
     marginHorizontal: 15,
-    marginTop: 5,
+    marginTop: 2,
+    marginBottom: 2,
     borderWidth: 1,
     borderColor: "#5BB8E8",
   },
   addressText: {
     flex: 1,
     color: "#A8D8F0",
-    fontSize: 11,
-    marginLeft: 8,
-    lineHeight: 16,
+    fontSize: 10,
+    marginLeft: 4,
+    lineHeight: 14,
   },
   mapSection: {
     position: "relative",
@@ -509,35 +498,6 @@ const styles = StyleSheet.create({
     borderColor: "#5BB8E8",
     alignItems: "center",
     justifyContent: "center",
-  },
-  bottomNav: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 80,
-    backgroundColor: "rgba(26, 42, 58, 0.95)",
-    flexDirection: "row",
-    borderTopWidth: 1,
-    borderTopColor: "#5BB8E8",
-  },
-  navButton: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 10,
-  },
-  navButtonActive: {
-    backgroundColor: "#5BB8E8",
-  },
-  navText: {
-    color: "#A8D8F0",
-    fontSize: 11,
-    marginTop: 4,
-    fontWeight: "600",
-  },
-  navTextActive: {
-    color: "white",
   },
 });
 

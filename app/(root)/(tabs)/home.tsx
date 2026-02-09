@@ -112,7 +112,7 @@ const Home = () => {
     // Navigate to different screens/tabs
     switch (screen) {
       case "tracking":
-        router.push("/(root)/(tabs)/tracking");
+        router.push("/(root)/(tabs)/alerts");
         break;
       case "vehicles":
         router.push("/(root)/(tabs)/vehicles");
@@ -121,7 +121,7 @@ const Home = () => {
         router.push("/(root)/(tabs)/alerts");
         break;
       case "settings":
-        router.push("/(root)/(tabs)/profile");
+        router.push("/(root)/(tabs)/settings");
         break;
       default:
         break;
@@ -140,7 +140,7 @@ const Home = () => {
             </TouchableOpacity>
             <Text className="text-white text-xl font-JakartaBold">Dashboard</Text>
             {/* Settings Gear Icon */}
-            <TouchableOpacity className="p-2" onPress={() => router.push("/(root)/(tabs)/profile")}>
+            <TouchableOpacity className="p-2" onPress={() => router.push("/(root)/(tabs)/settings")}>
               <Ionicons name="settings-outline" size={26} color="white" />
             </TouchableOpacity>
           </View>
@@ -176,7 +176,7 @@ const Home = () => {
                 </TouchableOpacity>
                 <TouchableOpacity
                   className="w-10 h-10 items-center justify-center"
-                  onPress={() => router.push("/(root)/(tabs)/profile")}
+                  onPress={() => router.push("/(root)/(tabs)/settings")}
                 >
                   <Image source={icons.profile} className="w-6 h-6" tintColor="white" />
                 </TouchableOpacity>
