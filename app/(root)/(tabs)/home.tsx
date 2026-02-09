@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons } from "@expo/vector-icons";
 
 import { icons } from "@/constants";
 import { useFetch } from "@/lib/fetch";
@@ -128,17 +129,19 @@ const Home = () => {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-100">
+    <View className="flex-1 bg-gray-100">
       {/* Fixed Top Bar */}
-      <View className="bg-blue-500" style={{ backgroundColor: "#5BB8E8" }}>
-        <View className="px-5 py-3">
+      <View className="bg-blue-500" style={{ backgroundColor: "#5BB8E8", paddingTop: 40 }}>
+        <View className="px-5 py-2">
           <View className="flex-row justify-between items-center">
-            <TouchableOpacity>
-              <Image source={icons.list} className="w-7 h-7" tintColor="white" />
+            {/* Hamburger Menu Icon */}
+            <TouchableOpacity className="p-2">
+              <Ionicons name="menu" size={28} color="white" />
             </TouchableOpacity>
             <Text className="text-white text-xl font-JakartaBold">Dashboard</Text>
-            <TouchableOpacity onPress={() => router.push("/(root)/(tabs)/profile")}>
-              <Image source={icons.profile} className="w-7 h-7" tintColor="white" />
+            {/* Settings Gear Icon */}
+            <TouchableOpacity className="p-2" onPress={() => router.push("/(root)/(tabs)/profile")}>
+              <Ionicons name="settings-outline" size={26} color="white" />
             </TouchableOpacity>
           </View>
         </View>
@@ -324,7 +327,7 @@ const Home = () => {
           <Text className="text-gray-400 text-xs font-JakartaMedium">Disclaimer</Text>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };
 

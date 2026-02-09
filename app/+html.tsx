@@ -34,9 +34,32 @@ export default function Root({ children }: PropsWithChildren) {
 const responsiveBackground = `
 body {
   background-color: #fff;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 100vh;
+}
+#root {
+  width: 100%;
+  max-width: 430px;
+  min-height: 100vh;
+  box-shadow: 0 0 50px rgba(0,0,0,0.1);
+  position: relative;
+  background-color: #fff;
+}
+@media (max-width: 430px) {
+  #root {
+    max-width: 100%;
+    box-shadow: none;
+  }
 }
 @media (prefers-color-scheme: dark) {
   body {
+    background-color: #1a1a1a;
+  }
+  #root {
     background-color: #000;
   }
 }`;

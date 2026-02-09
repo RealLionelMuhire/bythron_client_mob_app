@@ -62,6 +62,17 @@ export default function Layout() {
       />
 
       <Tabs.Screen
+        name="tracking"
+        options={{
+          title: "Tracking",
+          headerShown: false,
+          tabBarIcon: ({ focused }) => (
+            <TabIcon source={icons.map} focused={focused} />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
         name="profile"
         options={{
           title: "Profile",
