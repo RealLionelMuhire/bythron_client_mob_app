@@ -32,7 +32,7 @@ export default function Layout() {
       }}
     >
       <Tabs.Screen
-        name="home_old"
+        name="home"
         options={{
           title: "Home",
           tabBarIcon: ({ color, size }) => (
@@ -86,7 +86,7 @@ export default function Layout() {
       />
 
       <Tabs.Screen
-        name="home"
+        name="home_old"
         options={{
           href: null,
         }}

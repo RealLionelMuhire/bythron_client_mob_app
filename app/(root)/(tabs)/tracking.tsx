@@ -117,6 +117,11 @@ const Tracking = () => {
   const { userLatitude, userLongitude } = useLocationStore();
   const cameraRef = useRef<Mapbox.Camera>(null);
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
+  const [mapStyle, setMapStyle] = useState(
+    "mapbox://styles/mapbox/satellite-streets-v12"
+  );
+  const [zoomLevel, setZoomLevel] = useState(14);
+  const [pitch, setPitch] = useState(45);
 
   // Select first device by default
   useEffect(() => {
@@ -130,6 +135,44 @@ const Tracking = () => {
   const totalDistance = 83337.62; // This would come from device data
   const status = device?.status === "online" ? "Moving" : "Stopped";
   const address = "Sheikh Zayed Rd";
+
+  const recenterMap = (options?: { zoom?: number; pitch?: number }) => {
+    const nextZoom = options?.zoom ?? zoomLevel;
+    const nextPitch = options?.pitch ?? pitch;
+
+    setZoomLevel(nextZoom);
+    setPitch(nextPitch);
+
+    cameraRef.current?.setCamera({
+      centerCoordinate: [userLongitude, userLatitude],
+      zoomLevel: nextZoom,
+      pitch: nextPitch,
+      animationMode: "flyTo",
+      animationDuration: 800,
+    });
+  };
+
+  const handleToggleStyle = () => {
+    setMapStyle((prev) =>
+      prev.includes("satellite")
+        ? "mapbox://styles/mapbox/dark-v11"
+        : "mapbox://styles/mapbox/satellite-streets-v12"
+    );
+  };
+
+  const handleNavigationView = () => {
+    recenterMap({ zoom: 16, pitch: 60 });
+  };
+
+  const handleZoomIn = () => {
+    const nextZoom = Math.min(20, zoomLevel + 1);
+    recenterMap({ zoom: nextZoom });
+  };
+
+  const handleToggle3D = () => {
+    const nextPitch = pitch > 0 ? 0 : 60;
+    recenterMap({ pitch: nextPitch });
+  };
 
   // Format time ago
   const formatTimeAgo = (date?: string) => {
@@ -222,15 +265,6 @@ const Tracking = () => {
               <Text style={styles.infoLabel}>Last Pos...</Text>
               <Text style={styles.infoTime}>{formatTimeAgo(device?.last_seen)}</Text>
             </View>
-
-            <View style={styles.infoCard}>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoDate}>22-05-24</Text>
-                <Ionicons name="time-outline" size={16} color="#5BB8E8" />
-              </View>
-              <Text style={styles.infoLabel}>Last Upd...</Text>
-              <Text style={styles.infoTime}>{formatTimeAgo(device?.last_seen)}</Text>
-            </View>
           </View>
         </View>
 
@@ -248,7 +282,7 @@ const Tracking = () => {
       <View style={[styles.mapSection, { height: height * 0.62 }]}>
         <Mapbox.MapView
           style={styles.map}
-          styleURL="mapbox://styles/mapbox/dark-v11"
+          styleURL={mapStyle}
           zoomEnabled={true}
           scrollEnabled={true}
           pitchEnabled={true}
@@ -256,11 +290,11 @@ const Tracking = () => {
         >
           <Mapbox.Camera
             ref={cameraRef}
-            zoomLevel={14}
+            zoomLevel={zoomLevel}
             centerCoordinate={[userLongitude, userLatitude]}
             animationMode="flyTo"
             animationDuration={1000}
-            pitch={45}
+            pitch={pitch}
           />
 
           {/* Device Marker */}
@@ -286,22 +320,22 @@ const Tracking = () => {
 
         {/* Left Side Menu */}
         <View style={styles.leftMenu}>
-          <TouchableOpacity style={styles.menuButton}>
+          <TouchableOpacity style={styles.menuButton} onPress={handleToggleStyle}>
             <MaterialCommunityIcons name="routes" size={24} color="#5BB8E8" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.menuButton}>
+          <TouchableOpacity style={styles.menuButton} onPress={() => recenterMap({ zoom: 12, pitch: 0 })}>
             <Ionicons name="information-circle" size={24} color="#5BB8E8" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.menuButton}>
+          <TouchableOpacity style={styles.menuButton} onPress={() => recenterMap()}>
             <MaterialCommunityIcons name="map-marker" size={24} color="#5BB8E8" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.menuButton}>
+          <TouchableOpacity style={styles.menuButton} onPress={handleNavigationView}>
             <Ionicons name="car-sport" size={24} color="#5BB8E8" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.menuButton}>
+          <TouchableOpacity style={styles.menuButton} onPress={handleZoomIn}>
             <Ionicons name="refresh" size={24} color="#5BB8E8" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.menuButton}>
+          <TouchableOpacity style={styles.menuButton} onPress={handleToggle3D}>
             <Ionicons name="cube" size={24} color="#5BB8E8" />
           </TouchableOpacity>
         </View>
@@ -359,16 +393,16 @@ const styles = StyleSheet.create({
     marginTop: -6,
   },
   totalDistance: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: "bold",
     color: "white",
-    marginTop: -4,
+    marginTop: -9,
   },
   currentSpeed: {
-    fontSize: 26,
+    fontSize: 20,
     fontWeight: "bold",
     color: "white",
-    marginTop: -6,
+    marginTop: -2,
   },
   rightInfo: {
     width: 100,
@@ -390,7 +424,7 @@ const styles = StyleSheet.create({
   },
   statusText: {
     color: "#5BB8E8",
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: "600",
   },
   statusLabel: {
@@ -419,12 +453,12 @@ const styles = StyleSheet.create({
   },
   infoLabel: {
     color: "#A8D8F0",
-    fontSize: 9,
+    fontSize: 11,
     marginTop: 2,
   },
   infoTime: {
     color: "white",
-    fontSize: 9,
+    fontSize: 11,
     fontWeight: "600",
     marginTop: 2,
   },
