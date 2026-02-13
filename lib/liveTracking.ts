@@ -12,7 +12,13 @@ export const startLocationPolling = (
 ): (() => void) => {
     const interval = setInterval(async () => {
         try {
-            const response = await fetch(`/api/locations/${deviceId}/latest`);
+            const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
+            if (!baseUrl) {
+                console.error("API base URL not configured");
+                return;
+            }
+
+            const response = await fetch(`${baseUrl}/api/locations/${deviceId}/latest`);
 
             if (!response.ok) {
                 console.error(`Failed to fetch location: ${response.status}`);
@@ -43,8 +49,13 @@ export const fetchHistoricalRoute = async (
     endTime: string
 ) => {
     try {
+        const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
+        if (!baseUrl) {
+            throw new Error("API base URL not configured");
+        }
+
         const response = await fetch(
-            `/api/locations/${deviceId}/route?start_time=${encodeURIComponent(startTime)}&end_time=${encodeURIComponent(endTime)}`
+            `${baseUrl}/api/locations/${deviceId}/route?start_time=${encodeURIComponent(startTime)}&end_time=${encodeURIComponent(endTime)}`
         );
 
         if (!response.ok) {
