@@ -5,6 +5,7 @@ import Mapbox from "@rnmapbox/maps";
 import { useDeviceStore, useLocationStore } from "@/store";
 import { Device } from "@/types/type";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { startLocationPolling } from "@/lib/liveTracking";
 
 const { height } = Dimensions.get("window");
 
@@ -113,8 +114,8 @@ const Speedometer = ({ speed = 0, maxSpeed = 200 }: { speed: number; maxSpeed?: 
 };
 
 const Tracking = () => {
-  const { devices } = useDeviceStore();
-  const { userLatitude, userLongitude } = useLocationStore();
+  const { devices, currentLocation, setCurrentLocation } = useDeviceStore();
+  const { userLatitude, userLongitude, userAddress } = useLocationStore();
   const cameraRef = useRef<Mapbox.Camera>(null);
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [mapStyle, setMapStyle] = useState(
@@ -122,19 +123,76 @@ const Tracking = () => {
   );
   const [zoomLevel, setZoomLevel] = useState(14);
   const [pitch, setPitch] = useState(45);
+  const [streetName, setStreetName] = useState("Locating...");
+  const [batteryLevel, setBatteryLevel] = useState<number | null>(null);
+  const device = selectedDevice || devices?.[0];
+  const speed = currentLocation?.speed ?? device?.speed ?? 0;
+  const totalDistance = 83337.62; // This would come from device data
+  const status = device?.status === "online" ? "Moving" : "Stopped";
+  const address = streetName;
+  const targetLatitude = currentLocation?.latitude ?? userLatitude;
+  const targetLongitude = currentLocation?.longitude ?? userLongitude;
 
   // Select first device by default
   useEffect(() => {
     if (devices && devices.length > 0 && !selectedDevice) {
       setSelectedDevice(devices[0]);
     }
-  }, [devices]);
+  }, [devices, selectedDevice]);
 
-  const device = selectedDevice || devices?.[0];
-  const speed = device?.speed || 9;
-  const totalDistance = 83337.62; // This would come from device data
-  const status = device?.status === "online" ? "Moving" : "Stopped";
-  const address = "Sheikh Zayed Rd";
+  useEffect(() => {
+    if (!device?.id) return;
+
+    const cleanup = startLocationPolling(device.id, (location) => {
+      setCurrentLocation(location);
+    });
+
+    return () => {
+      if (cleanup) cleanup();
+    };
+  }, [device?.id, setCurrentLocation]);
+
+  useEffect(() => {
+    setBatteryLevel(typeof device?.battery_level === "number" ? device.battery_level : null);
+  }, [device?.battery_level, device?.id]);
+
+  useEffect(() => {
+    let isActive = true;
+
+    const fetchNearestStreet = async () => {
+      if (!targetLatitude || !targetLongitude) return;
+      if (!accessToken) {
+        if (isActive) setStreetName(userAddress || "No Mapbox token");
+        return;
+      }
+
+      try {
+        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${targetLongitude},${targetLatitude}.json?types=address,street&limit=1&language=en&access_token=${accessToken}`;
+        const response = await fetch(url);
+        const data = await response.json();
+        const feature = data?.features?.[0];
+        const name = feature?.place_name || feature?.text;
+
+        if (isActive && name) {
+          setStreetName(name);
+        } else if (isActive) {
+          setStreetName(userAddress || "Unknown street");
+        }
+      } catch (error) {
+        if (isActive) setStreetName(userAddress || "Unknown street");
+      }
+    };
+
+    if (userAddress && isActive) {
+      setStreetName(userAddress);
+    }
+
+    fetchNearestStreet();
+
+    return () => {
+      isActive = false;
+    };
+  }, [targetLatitude, targetLongitude, userAddress]);
 
   const recenterMap = (options?: { zoom?: number; pitch?: number }) => {
     const nextZoom = options?.zoom ?? zoomLevel;
@@ -143,8 +201,9 @@ const Tracking = () => {
     setZoomLevel(nextZoom);
     setPitch(nextPitch);
 
+    if (targetLongitude == null || targetLatitude == null) return;
     cameraRef.current?.setCamera({
-      centerCoordinate: [userLongitude, userLatitude],
+      centerCoordinate: [targetLongitude, targetLatitude],
       zoomLevel: nextZoom,
       pitch: nextPitch,
       animationMode: "flyTo",
@@ -189,7 +248,7 @@ const Tracking = () => {
     return lastSeen.toLocaleDateString();
   };
 
-  if (!userLatitude || !userLongitude) {
+  if (!targetLatitude || !targetLongitude) {
     return (
       <View className="flex-1 items-center justify-center" style={{ backgroundColor: "#1A2A3A" }}>
         <ActivityIndicator size="large" color="#5BB8E8" />
@@ -229,7 +288,9 @@ const Tracking = () => {
             <View style={styles.iconButton}>
               <Ionicons name="battery-half" size={20} color="#5BB8E8" />
               <Text style={styles.iconLabel}>Battery</Text>
-              <Text style={styles.iconStatus}>0%</Text>
+              <Text style={styles.iconStatus}>
+                {batteryLevel != null ? `${batteryLevel}%` : "--"}
+              </Text>
             </View>
             <View style={styles.iconButton}>
               <MaterialCommunityIcons name="key" size={20} color="#5BB8E8" />
@@ -291,7 +352,7 @@ const Tracking = () => {
           <Mapbox.Camera
             ref={cameraRef}
             zoomLevel={zoomLevel}
-            centerCoordinate={[userLongitude, userLatitude]}
+            centerCoordinate={[targetLongitude, targetLatitude]}
             animationMode="flyTo"
             animationDuration={1000}
             pitch={pitch}
@@ -300,7 +361,7 @@ const Tracking = () => {
           {/* Device Marker */}
           <Mapbox.PointAnnotation
             id="device-marker"
-            coordinate={[userLongitude, userLatitude]}
+            coordinate={[targetLongitude, targetLatitude]}
           >
             <View style={styles.carMarker}>
               <Ionicons name="car" size={32} color="white" />
@@ -310,7 +371,7 @@ const Tracking = () => {
           {/* Location Pin */}
           <Mapbox.PointAnnotation
             id="location-pin"
-            coordinate={[userLongitude + 0.002, userLatitude + 0.002]}
+            coordinate={[targetLongitude + 0.002, targetLatitude + 0.002]}
           >
             <View style={styles.locationPin}>
               <Ionicons name="location" size={24} color="#5BB8E8" />

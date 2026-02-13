@@ -16,7 +16,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 
 import { icons } from "@/constants";
-import { useFetch } from "@/lib/fetch";
+import { fetchAPI, useFetch } from "@/lib/fetch";
 import { useLocationStore, useDeviceStore } from "@/store";
 import { Device } from "@/types/type";
 
@@ -40,12 +40,21 @@ const Home = () => {
   // Sync user to backend on load
   useEffect(() => {
     if (user) {
-      fetch("/(api)/auth/sync", {
+      const safeName =
+        user.fullName ||
+        [user.firstName, user.lastName].filter(Boolean).join(" ") ||
+        user.primaryEmailAddress?.emailAddress?.split("@")[0] ||
+        "Unknown";
+
+      fetchAPI("/api/auth/sync", {
         method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
-          userId: user.id,
+          clerk_user_id: user.id,
           email: user.primaryEmailAddress?.emailAddress,
-          name: user.fullName || `${user.firstName} ${user.lastName}`,
+          name: safeName,
         }),
       }).catch((err) => console.error("Auth sync failed", err));
     }
@@ -56,7 +65,7 @@ const Home = () => {
     data: devicesData,
     loading,
     refetch,
-  } = useFetch<{ data: Device[] }>("/(api)/devices");
+  } = useFetch<{ data: Device[] }>("/api/devices/");
 
   useEffect(() => {
     if (devicesData?.data) {
@@ -129,9 +138,9 @@ const Home = () => {
   };
 
   return (
-    <View className="flex-1 bg-gray-100">
+    <View className="flex-1" style={{ backgroundColor: "#F7FAFF" }}>
       {/* Fixed Top Bar */}
-      <View className="bg-blue-500" style={{ backgroundColor: "#5BB8E8", paddingTop: 40 }}>
+      <View style={{ backgroundColor: "#A8D8F0", paddingTop: 40 }}>
         <View className="px-5 py-2">
           <View className="flex-row justify-between items-center">
             {/* Hamburger Menu Icon */}
@@ -147,12 +156,16 @@ const Home = () => {
         </View>
       </View>
 
-      <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+      <ScrollView
+        className="flex-1"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 120 }}
+      >
         {/* User Profile Section */}
-        <View className="bg-blue-500 pb-8" style={{ backgroundColor: "#5BB8E8" }}>
+        <View style={{ backgroundColor: "#A8D8F0", paddingBottom: 24 }}>
           <View className="px-5">
             <View className="flex-row items-center mb-5">
-              <View className="w-20 h-20 rounded-full bg-white items-center justify-center mr-4">
+              <View className="w-20 h-20 rounded-full items-center justify-center mr-4" style={{ backgroundColor: "#EAF4FF", borderWidth: 1, borderColor: "#5BB8E8" }}>
                 {user?.imageUrl ? (
                   <Image
                     source={{ uri: user.imageUrl }}
@@ -163,22 +176,22 @@ const Home = () => {
                 )}
               </View>
               <View className="flex-1">
-                <Text className="text-white text-base font-JakartaMedium opacity-90">
+                <Text className="text-slate-700 text-base font-JakartaMedium opacity-90">
                   {getGreeting()}
                 </Text>
-                <Text className="text-white text-xl font-JakartaBold">
+                <Text className="text-slate-900 text-xl font-JakartaBold">
                   {user?.fullName || user?.firstName || "User"}
                 </Text>
               </View>
               <View className="flex-row">
                 <TouchableOpacity className="w-10 h-10 items-center justify-center mr-2">
-                  <Image source={icons.chat} className="w-6 h-6" tintColor="white" />
+                  <Image source={icons.chat} className="w-6 h-6" tintColor="#1A2A3A" />
                 </TouchableOpacity>
                 <TouchableOpacity
                   className="w-10 h-10 items-center justify-center"
                   onPress={() => router.push("/(root)/(tabs)/settings")}
                 >
-                  <Image source={icons.profile} className="w-6 h-6" tintColor="white" />
+                  <Image source={icons.profile} className="w-6 h-6" tintColor="#1A2A3A" />
                 </TouchableOpacity>
               </View>
             </View>
@@ -186,17 +199,29 @@ const Home = () => {
         </View>
 
         {/* Statistics Card */}
-        <View className="px-5 -mt-6">
-          <View className="bg-white rounded-2xl p-5 shadow-lg" style={{ elevation: 5 }}>
+        <View className="px-5 -mt-2">
+          <View
+            className="rounded-2xl p-5"
+            style={{
+              backgroundColor: "#FFFFFF",
+              borderWidth: 1,
+              borderColor: "#D9EAF7",
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.08,
+              shadowRadius: 10,
+              elevation: 3,
+            }}
+          >
             {/* Header */}
             <View className="flex-row justify-between items-center mb-4">
-              <View className="bg-blue-500 px-4 py-2 rounded-full" style={{ backgroundColor: "#5BB8E8" }}>
-                <Text className="text-white font-JakartaBold text-sm">
+              <View className="px-4 py-2 rounded-full" style={{ backgroundColor: "#EAF4FF", borderWidth: 1, borderColor: "#5BB8E8" }}>
+                <Text className="text-slate-900 font-JakartaBold text-sm">
                   Total Vehicles: {stats.total}
                 </Text>
               </View>
               <TouchableOpacity onPress={refetch}>
-                <Image source={icons.search} className="w-6 h-6" tintColor="#666" />
+                <Image source={icons.search} className="w-6 h-6" tintColor="#5BB8E8" />
               </TouchableOpacity>
             </View>
 
@@ -209,44 +234,44 @@ const Home = () => {
                 <View className="items-center">
                   <View
                     className="w-20 h-20 rounded-full items-center justify-center mb-2"
-                    style={{ borderWidth: 6, borderColor: "#5BB8E8" }}
+                    style={{ borderWidth: 6, borderColor: "#5BB8E8", backgroundColor: "#F5FBFF" }}
                   >
-                    <Text className="text-2xl font-JakartaBold">{stats.moving}</Text>
+                    <Text className="text-2xl font-JakartaBold text-slate-900">{stats.moving}</Text>
                   </View>
-                  <Text className="text-sm font-JakartaMedium text-gray-700">Moving</Text>
+                  <Text className="text-sm font-JakartaMedium text-slate-700">Moving</Text>
                 </View>
 
                 {/* Idle */}
                 <View className="items-center">
                   <View
                     className="w-20 h-20 rounded-full items-center justify-center mb-2"
-                    style={{ borderWidth: 6, borderColor: "#9DD6F0" }}
+                    style={{ borderWidth: 6, borderColor: "#9DD6F0", backgroundColor: "#F5FBFF" }}
                   >
-                    <Text className="text-2xl font-JakartaBold">{stats.idle}</Text>
+                    <Text className="text-2xl font-JakartaBold text-slate-900">{stats.idle}</Text>
                   </View>
-                  <Text className="text-sm font-JakartaMedium text-gray-700">Idle</Text>
+                  <Text className="text-sm font-JakartaMedium text-slate-700">Idle</Text>
                 </View>
 
                 {/* Parked */}
                 <View className="items-center">
                   <View
                     className="w-20 h-20 rounded-full items-center justify-center mb-2"
-                    style={{ borderWidth: 6, borderColor: "#4CAF50" }}
+                    style={{ borderWidth: 6, borderColor: "#4CAF50", backgroundColor: "#F5FBFF" }}
                   >
-                    <Text className="text-2xl font-JakartaBold">{stats.parked}</Text>
+                    <Text className="text-2xl font-JakartaBold text-slate-900">{stats.parked}</Text>
                   </View>
-                  <Text className="text-sm font-JakartaMedium text-gray-700">Parked</Text>
+                  <Text className="text-sm font-JakartaMedium text-slate-700">Parked</Text>
                 </View>
 
                 {/* NR */}
                 <View className="items-center">
                   <View
                     className="w-20 h-20 rounded-full items-center justify-center mb-2"
-                    style={{ borderWidth: 6, borderColor: "#9E9E9E" }}
+                    style={{ borderWidth: 6, borderColor: "#9E9E9E", backgroundColor: "#F5FBFF" }}
                   >
-                    <Text className="text-2xl font-JakartaBold">{stats.nr}</Text>
+                    <Text className="text-2xl font-JakartaBold text-slate-900">{stats.nr}</Text>
                   </View>
-                  <Text className="text-sm font-JakartaMedium text-gray-700">NR</Text>
+                  <Text className="text-sm font-JakartaMedium text-slate-700">NR</Text>
                 </View>
               </View>
             )}
@@ -254,76 +279,104 @@ const Home = () => {
         </View>
 
         {/* Action Cards Grid */}
-        <View className="px-5 mt-6 pb-10">
+        <View className="px-5 mt-5">
           <View className="flex-row flex-wrap justify-between">
             {/* Live Tracking */}
             <TouchableOpacity
               onPress={() => handleNavigation("tracking")}
-              className="bg-white rounded-2xl p-6 mb-4 items-center justify-center shadow"
+              className="rounded-2xl p-6 mb-4 items-center justify-center"
               style={{
                 width: (width - 50) / 2,
                 height: 160,
-                elevation: 3,
+                backgroundColor: "#FFFFFF",
+                borderWidth: 1,
+                borderColor: "#D9EAF7",
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 3 },
+                shadowOpacity: 0.06,
+                shadowRadius: 8,
+                elevation: 2,
               }}
             >
-              <View className="w-16 h-16 rounded-full bg-blue-50 items-center justify-center mb-3">
+              <View className="w-16 h-16 rounded-full items-center justify-center mb-3" style={{ backgroundColor: "#EAF4FF", borderWidth: 1, borderColor: "#5BB8E8" }}>
                 <Image source={icons.marker} className="w-10 h-10" tintColor="#5BB8E8" />
               </View>
-              <Text className="text-base font-JakartaBold text-gray-800">Live Tracking</Text>
+              <Text className="text-base font-JakartaBold text-slate-900">Live Tracking</Text>
             </TouchableOpacity>
 
             {/* Vehicle List */}
             <TouchableOpacity
               onPress={() => handleNavigation("vehicles")}
-              className="bg-white rounded-2xl p-6 mb-4 items-center justify-center shadow"
+              className="rounded-2xl p-6 mb-4 items-center justify-center"
               style={{
                 width: (width - 50) / 2,
                 height: 160,
-                elevation: 3,
+                backgroundColor: "#FFFFFF",
+                borderWidth: 1,
+                borderColor: "#D9EAF7",
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 3 },
+                shadowOpacity: 0.06,
+                shadowRadius: 8,
+                elevation: 2,
               }}
             >
-              <View className="w-16 h-16 rounded-full bg-blue-50 items-center justify-center mb-3">
+              <View className="w-16 h-16 rounded-full items-center justify-center mb-3" style={{ backgroundColor: "#EAF4FF", borderWidth: 1, borderColor: "#5BB8E8" }}>
                 <Image source={icons.list} className="w-10 h-10" tintColor="#5BB8E8" />
               </View>
-              <Text className="text-base font-JakartaBold text-gray-800">Vehicle List</Text>
+              <Text className="text-base font-JakartaBold text-slate-900">Vehicle List</Text>
             </TouchableOpacity>
 
             {/* Alerts */}
             <TouchableOpacity
               onPress={() => handleNavigation("alerts")}
-              className="bg-white rounded-2xl p-6 mb-4 items-center justify-center shadow"
+              className="rounded-2xl p-6 mb-4 items-center justify-center"
               style={{
                 width: (width - 50) / 2,
                 height: 160,
-                elevation: 3,
+                backgroundColor: "#FFFFFF",
+                borderWidth: 1,
+                borderColor: "#D9EAF7",
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 3 },
+                shadowOpacity: 0.06,
+                shadowRadius: 8,
+                elevation: 2,
               }}
             >
-              <View className="w-16 h-16 rounded-full bg-blue-50 items-center justify-center mb-3">
+              <View className="w-16 h-16 rounded-full items-center justify-center mb-3" style={{ backgroundColor: "#EAF4FF", borderWidth: 1, borderColor: "#5BB8E8" }}>
                 <Image source={icons.star} className="w-10 h-10" tintColor="#5BB8E8" />
               </View>
-              <Text className="text-base font-JakartaBold text-gray-800">Alerts</Text>
+              <Text className="text-base font-JakartaBold text-slate-900">Alerts</Text>
             </TouchableOpacity>
 
             {/* Settings */}
             <TouchableOpacity
               onPress={() => handleNavigation("settings")}
-              className="bg-white rounded-2xl p-6 mb-4 items-center justify-center shadow"
+              className="rounded-2xl p-6 mb-4 items-center justify-center"
               style={{
                 width: (width - 50) / 2,
                 height: 160,
-                elevation: 3,
+                backgroundColor: "#FFFFFF",
+                borderWidth: 1,
+                borderColor: "#D9EAF7",
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 3 },
+                shadowOpacity: 0.06,
+                shadowRadius: 8,
+                elevation: 2,
               }}
             >
-              <View className="w-16 h-16 rounded-full bg-blue-50 items-center justify-center mb-3">
+              <View className="w-16 h-16 rounded-full items-center justify-center mb-3" style={{ backgroundColor: "#EAF4FF", borderWidth: 1, borderColor: "#5BB8E8" }}>
                 <Image source={icons.profile} className="w-10 h-10" tintColor="#5BB8E8" />
               </View>
-              <Text className="text-base font-JakartaBold text-gray-800">Settings</Text>
+              <Text className="text-base font-JakartaBold text-slate-900">Settings</Text>
             </TouchableOpacity>
           </View>
         </View>
 
         {/* Disclaimer */}
-        <View className="px-5 pb-10 items-center">
+        <View className="px-5 pb-6 items-center">
           <Text className="text-gray-400 text-xs font-JakartaMedium">Disclaimer</Text>
         </View>
       </ScrollView>

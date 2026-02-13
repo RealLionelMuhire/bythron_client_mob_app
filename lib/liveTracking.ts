@@ -12,7 +12,7 @@ export const startLocationPolling = (
 ): (() => void) => {
     const interval = setInterval(async () => {
         try {
-            const response = await fetch(`/(api)/locations/${deviceId}/latest`);
+            const response = await fetch(`/api/locations/${deviceId}/latest`);
 
             if (!response.ok) {
                 console.error(`Failed to fetch location: ${response.status}`);
@@ -44,7 +44,7 @@ export const fetchHistoricalRoute = async (
 ) => {
     try {
         const response = await fetch(
-            `/(api)/locations/${deviceId}/route?start_time=${encodeURIComponent(startTime)}&end_time=${encodeURIComponent(endTime)}`
+            `/api/locations/${deviceId}/route?start_time=${encodeURIComponent(startTime)}&end_time=${encodeURIComponent(endTime)}`
         );
 
         if (!response.ok) {

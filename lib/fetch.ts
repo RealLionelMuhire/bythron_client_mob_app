@@ -2,10 +2,28 @@ import { useState, useEffect, useCallback } from "react";
 
 export const fetchAPI = async (url: string, options?: RequestInit) => {
   try {
-    const response = await fetch(url, options);
-    if (!response.ok) {
-      new Error(`HTTP error! status: ${response.status}`);
+    const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
+    const isLocalApiRoute = url.startsWith("/(api)");
+    if (!baseUrl && !url.startsWith("http") && !isLocalApiRoute) {
+      throw new Error("Missing EXPO_PUBLIC_API_BASE_URL for relative API request");
     }
+    const normalizedPath = isLocalApiRoute ? url.replace("/(api)", "/api") : url;
+    const fullUrl = url.startsWith("http") || isLocalApiRoute ? normalizedPath : `${baseUrl}${normalizedPath}`;
+    const response = await fetch(fullUrl, options);
+    const contentType = response.headers.get("content-type") || "";
+    const isJson = contentType.includes("application/json");
+
+    if (!response.ok) {
+      const errorBody = isJson ? await response.json() : await response.text();
+      const errorPayload = typeof errorBody === "string" ? errorBody : JSON.stringify(errorBody);
+      throw new Error(`HTTP ${response.status} (${fullUrl}): ${errorPayload}`);
+    }
+
+    if (!isJson) {
+      const text = await response.text();
+      throw new Error(`Expected JSON but got: ${text.slice(0, 200)}`);
+    }
+
     return await response.json();
   } catch (error) {
     console.error("Fetch error:", error);

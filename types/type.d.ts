@@ -8,6 +8,7 @@ declare interface Device {
   last_seen: string;
   imei?: string;
   speed?: number;
+  battery_level?: number;
 }
 
 declare interface Location {
