@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Image,
   Platform,
   ScrollView,
   Text,
@@ -16,6 +17,7 @@ import Svg, { Circle, Line, Path, Text as SvgText } from "react-native-svg";
 import { fetchAPI } from "@/lib/fetch";
 import { useDeviceStore, useLocationStore } from "@/store";
 import { Device } from "@/types/type";
+import { NavigationArrow } from "@/components/NavigationArrow";
 
 type RouteFeature = {
   type: "Feature";
@@ -155,6 +157,12 @@ const Speedometer = ({ speed = 0, maxSpeed = 200 }: { speed: number; maxSpeed?: 
     return `M ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2}`;
   };
 
+  const step = 20;
+  const ticks = Array.from(
+    { length: Math.floor(maxSpeed / step) + 1 },
+    (_, idx) => idx * step
+  );
+
   return (
     <View style={{ alignItems: "center" }}>
       <Svg width={size} height={size}>
@@ -172,7 +180,7 @@ const Speedometer = ({ speed = 0, maxSpeed = 200 }: { speed: number; maxSpeed?: 
           fill="none"
           strokeLinecap="round"
         />
-        {[0, 100, 200].map((value) => {
+        {ticks.map((value) => {
           const angle = startAngle + totalAngle * (value / maxSpeed);
           const rad = (angle * Math.PI) / 180;
           const x = center + (radius - 14) * Math.cos(rad);
@@ -206,6 +214,10 @@ const Speedometer = ({ speed = 0, maxSpeed = 200 }: { speed: number; maxSpeed?: 
   );
 };
 
+const SPEEDOMETER_MAX = 100;
+// Set to 1 for km/h; use 3.6 if backend speeds are in m/s.
+const SPEED_DISPLAY_MULTIPLIER = 1;
+
 const History = () => {
   const cameraRef = useRef<Mapbox.Camera>(null);
   const { userLatitude, userLongitude } = useLocationStore();
@@ -227,7 +239,7 @@ const History = () => {
   const [isScrubbing, setIsScrubbing] = useState(false);
   const [isScrubbingSpeed, setIsScrubbingSpeed] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
-  const [smoothedCourse, setSmoothedCourse] = useState<number | null>(null);
+  const smoothedCourseRef = useRef<number | null>(null);
   const playbackPositionRef = useRef(0);
   const lastFrameTimeRef = useRef<number | null>(null);
 
@@ -478,18 +490,24 @@ const History = () => {
     } as RouteFeature;
   }, [playbackPoints, playbackPosition]);
 
-  useEffect(() => {
-    if (!animatedPoint) return;
+  const displayCourse = useMemo(() => {
+    if (!animatedPoint) return 0;
     const target = toNumberOrNull(animatedPoint.properties?.course) ?? 0;
-    setSmoothedCourse((prev) =>
-      prev == null ? target : interpolateBearing(prev, target, 0.15)
-    );
-  }, [animatedPoint]);
+    const prev = smoothedCourseRef.current;
+    const next = prev == null ? target : interpolateBearing(prev, target, 0.15);
+    smoothedCourseRef.current = next;
+    return next;
+  }, [animatedPoint?.properties?.course]);
 
   const currentSpeed = useMemo(() => {
     const speedValue = animatedPoint?.properties?.speed;
     return typeof speedValue === "number" ? speedValue : 0;
   }, [animatedPoint]);
+
+  const displaySpeed = useMemo(() => {
+    const next = Math.max(0, currentSpeed) * SPEED_DISPLAY_MULTIPLIER;
+    return Number.isFinite(next) ? next : 0;
+  }, [currentSpeed]);
 
   const playbackProgress = useMemo(() => {
     if (!playbackPoints.length) return 0;
@@ -541,7 +559,7 @@ const History = () => {
       const deltaSeconds = (time - lastFrameTimeRef.current) / 1000;
       lastFrameTimeRef.current = time;
 
-      const basePointsPerSecond = 12;
+      const basePointsPerSecond = 2;
       const increment = deltaSeconds * basePointsPerSecond * playbackSpeed;
       const nextPosition = playbackPositionRef.current + increment;
 
@@ -722,32 +740,31 @@ const History = () => {
                 id="historyMovingMarker"
                 coordinate={animatedPoint.geometry.coordinates}
                 allowOverlap
-                key={`${animatedPoint.geometry.coordinates[0]}-${animatedPoint.geometry.coordinates[1]}-${animatedPoint.properties?.course ?? 0}`}
               >
                 <View
                   style={{
-                    width: pitch > 0 ? 60 : 44,
-                    height: pitch > 0 ? 60 : 44,
-                    borderRadius: pitch > 0 ? 30 : 22,
-                    backgroundColor: "#FF4D4D",
+                    width: 30,
+                    height: 30,
                     alignItems: "center",
                     justifyContent: "center",
-                    borderWidth: 3,
+                    borderWidth: 2,
                     borderColor: "white",
+                    borderRadius: 15,
+                    backgroundColor: "rgba(255, 255, 255, 0.1)",
                     shadowColor: "#000",
                     shadowOffset: { width: 0, height: pitch > 0 ? 4 : 2 },
-                    shadowOpacity: pitch > 0 ? 0.4 : 0.2,
+                    shadowOpacity: pitch > 0 ? 0.35 : 0.2,
                     shadowRadius: pitch > 0 ? 6 : 3,
                     elevation: pitch > 0 ? 8 : 4,
                     transform: [
-                      { rotate: `${smoothedCourse ?? animatedPoint.properties?.course ?? 0}deg` },
+                      { rotate: `${displayCourse}deg` },
+                      ...(pitch > 0 ? [{ perspective: 1000 }, { rotateX: '25deg' }] : []),
                     ],
                   }}
                 >
-                  <MaterialCommunityIcons
-                    name="navigation"
-                    size={pitch > 0 ? 34 : 26}
-                    color="white"
+                  <NavigationArrow
+                    size={27}
+                    color="#E36060"
                   />
                 </View>
               </Mapbox.MarkerView>
@@ -768,9 +785,18 @@ const History = () => {
             borderColor: "#5BB8E8",
           }}
         >
-          <Speedometer speed={currentSpeed} maxSpeed={200} />
-          <Text style={{ color: "white", fontWeight: "700", marginTop: 6, fontSize: 12 }}>
-            {currentSpeed.toFixed(0)} KM/H
+          <Speedometer speed={displaySpeed} maxSpeed={SPEEDOMETER_MAX} />
+          <Text
+            style={{
+              color: "white",
+              fontWeight: "700",
+              marginTop: 6,
+              fontSize: 12,
+              textAlign: "center",
+              width: "100%",
+            }}
+          >
+            {displaySpeed.toFixed(0)} KM/H
           </Text>
         </View>
 
@@ -812,97 +838,99 @@ const History = () => {
             <Ionicons name={isPlaying ? "pause" : "play"} size={30} color="white" />
           </TouchableOpacity>
 
-          <View style={{ marginBottom: 10, flex: 1 }}>
-            <Text style={{ color: "white", fontSize: 12, marginBottom: 6 }}>
-              Progress
-            </Text>
-            <View
-              style={{ height: 6, borderRadius: 3, backgroundColor: "#243345" }}
-              onLayout={(event) => setProgressWidth(event.nativeEvent.layout.width)}
-              onStartShouldSetResponder={() => true}
-              onResponderGrant={(event) => {
-                setIsScrubbing(true);
-                handleProgressTouch(event.nativeEvent.locationX);
-              }}
-              onResponderMove={(event) => handleProgressTouch(event.nativeEvent.locationX)}
-              onResponderRelease={() => setIsScrubbing(false)}
-            >
+          <View style={{ flex: 1, gap: 12 }}>
+            <View>
+              <Text style={{ color: "white", fontSize: 12, marginBottom: 6 }}>
+                Speed
+              </Text>
               <View
-                style={{
-                  position: "absolute",
-                  left: 0,
-                  top: 0,
-                  bottom: 0,
-                  width: `${playbackProgress * 100}%`,
-                  backgroundColor: "#5BB8E8",
-                  borderRadius: 3,
+                style={{ height: 6, borderRadius: 3, backgroundColor: "#243345" }}
+                onLayout={(event) => setSpeedWidth(event.nativeEvent.layout.width)}
+                onStartShouldSetResponder={() => true}
+                onResponderGrant={(event) => {
+                  setIsScrubbingSpeed(true);
+                  handleSpeedTouch(event.nativeEvent.locationX);
                 }}
-              />
-              <View
-                style={{
-                  position: "absolute",
-                  left: `${playbackProgress * 100}%`,
-                  top: -5,
-                  width: 16,
-                  height: 16,
-                  borderRadius: 8,
-                  backgroundColor: "#5BB8E8",
-                  borderWidth: 2,
-                  borderColor: "white",
-                  transform: [{ translateX: -8 }],
-                  opacity: playbackPoints.length ? 1 : 0.5,
-                }}
-              />
+                onResponderMove={(event) => handleSpeedTouch(event.nativeEvent.locationX)}
+                onResponderRelease={() => setIsScrubbingSpeed(false)}
+              >
+                <View
+                  style={{
+                    position: "absolute",
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: `${speedProgress * 100}%`,
+                    backgroundColor: "#5BB8E8",
+                    borderRadius: 3,
+                  }}
+                />
+                <View
+                  style={{
+                    position: "absolute",
+                    left: `${speedProgress * 100}%`,
+                    top: -5,
+                    width: 16,
+                    height: 16,
+                    borderRadius: 8,
+                    backgroundColor: "#5BB8E8",
+                    borderWidth: 2,
+                    borderColor: "white",
+                    transform: [{ translateX: -8 }],
+                  }}
+                />
+              </View>
+              <Text style={{ color: isScrubbingSpeed ? "#5BB8E8" : "#A8D8F0", fontSize: 11, marginTop: 6 }}>
+                {playbackSpeed.toFixed(1)}x
+              </Text>
             </View>
-            <Text style={{ color: isScrubbing ? "#5BB8E8" : "#A8D8F0", fontSize: 11, marginTop: 6 }}>
-              {isScrubbing ? "Scrubbing" : "Playback"}
-            </Text>
-          </View>
 
-          <View>
-            <Text style={{ color: "white", fontSize: 12, marginBottom: 6 }}>
-              Speed
-            </Text>
-            <View
-              style={{ height: 6, borderRadius: 3, backgroundColor: "#243345" }}
-              onLayout={(event) => setSpeedWidth(event.nativeEvent.layout.width)}
-              onStartShouldSetResponder={() => true}
-              onResponderGrant={(event) => {
-                setIsScrubbingSpeed(true);
-                handleSpeedTouch(event.nativeEvent.locationX);
-              }}
-              onResponderMove={(event) => handleSpeedTouch(event.nativeEvent.locationX)}
-              onResponderRelease={() => setIsScrubbingSpeed(false)}
-            >
+            <View>
+              <Text style={{ color: "white", fontSize: 12, marginBottom: 6 }}>
+                Progress
+              </Text>
               <View
-                style={{
-                  position: "absolute",
-                  left: 0,
-                  top: 0,
-                  bottom: 0,
-                  width: `${speedProgress * 100}%`,
-                  backgroundColor: "#5BB8E8",
-                  borderRadius: 3,
+                style={{ height: 6, borderRadius: 3, backgroundColor: "#243345" }}
+                onLayout={(event) => setProgressWidth(event.nativeEvent.layout.width)}
+                onStartShouldSetResponder={() => true}
+                onResponderGrant={(event) => {
+                  setIsScrubbing(true);
+                  handleProgressTouch(event.nativeEvent.locationX);
                 }}
-              />
-              <View
-                style={{
-                  position: "absolute",
-                  left: `${speedProgress * 100}%`,
-                  top: -5,
-                  width: 16,
-                  height: 16,
-                  borderRadius: 8,
-                  backgroundColor: "#5BB8E8",
-                  borderWidth: 2,
-                  borderColor: "white",
-                  transform: [{ translateX: -8 }],
-                }}
-              />
+                onResponderMove={(event) => handleProgressTouch(event.nativeEvent.locationX)}
+                onResponderRelease={() => setIsScrubbing(false)}
+              >
+                <View
+                  style={{
+                    position: "absolute",
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: `${playbackProgress * 100}%`,
+                    backgroundColor: "#5BB8E8",
+                    borderRadius: 3,
+                  }}
+                />
+                <View
+                  style={{
+                    position: "absolute",
+                    left: `${playbackProgress * 100}%`,
+                    top: -5,
+                    width: 16,
+                    height: 16,
+                    borderRadius: 8,
+                    backgroundColor: "#5BB8E8",
+                    borderWidth: 2,
+                    borderColor: "white",
+                    transform: [{ translateX: -8 }],
+                    opacity: playbackPoints.length ? 1 : 0.5,
+                  }}
+                />
+              </View>
+              <Text style={{ color: isScrubbing ? "#5BB8E8" : "#A8D8F0", fontSize: 11, marginTop: 6 }}>
+                {isScrubbing ? "Scrubbing" : "Playback"}
+              </Text>
             </View>
-            <Text style={{ color: isScrubbingSpeed ? "#5BB8E8" : "#A8D8F0", fontSize: 11, marginTop: 6 }}>
-              {playbackSpeed.toFixed(1)}x
-            </Text>
           </View>
         </View>
 
