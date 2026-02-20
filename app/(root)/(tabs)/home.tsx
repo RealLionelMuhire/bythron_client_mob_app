@@ -1,7 +1,7 @@
 import { useUser, useAuth } from "@clerk/clerk-expo";
 import * as Location from "expo-location";
 import { router } from "expo-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Text,
   View,
@@ -26,16 +26,33 @@ const Home = () => {
   const { user } = useUser();
   const { signOut } = useAuth();
 
-  const { setUserLocation } = useLocationStore();
-  const { devices, setDevices } = useDeviceStore();
+  const setUserLocation = useLocationStore((s) => s.setUserLocation);
+  const devices = useDeviceStore((s) => s.devices);
+  const setDevices = useDeviceStore((s) => s.setDevices);
 
-  // Get greeting based on time of day
-  const getGreeting = () => {
+  const greeting = useMemo(() => {
     const hour = new Date().getHours();
     if (hour < 12) return "Good Morning";
     if (hour < 18) return "Good Afternoon";
     return "Good Evening";
-  };
+  }, []);
+
+  const stats = useMemo(() => {
+    if (!devices || devices.length === 0) {
+      return { total: 0, moving: 0, idle: 0, parked: 0, nr: 0 };
+    }
+    const moving = devices.filter((d) => d.status === "online" && d.speed && d.speed > 5).length;
+    const idle = devices.filter((d) => d.status === "online" && (!d.speed || d.speed <= 5)).length;
+    const parked = devices.filter((d) => d.status === "offline").length;
+    const nr = 0;
+    return {
+      total: devices.length,
+      moving,
+      idle,
+      parked,
+      nr,
+    };
+  }, [devices]);
 
   // Sync user to backend on load
   useEffect(() => {
@@ -94,28 +111,6 @@ const Home = () => {
       });
     })();
   }, []);
-
-  // Calculate vehicle statistics
-  const getVehicleStats = () => {
-    if (!devices || devices.length === 0) {
-      return { total: 0, moving: 0, idle: 0, parked: 0, nr: 0 };
-    }
-
-    const moving = devices.filter((d) => d.status === "online" && d.speed && d.speed > 5).length;
-    const idle = devices.filter((d) => d.status === "online" && (!d.speed || d.speed <= 5)).length;
-    const parked = devices.filter((d) => d.status === "offline").length;
-    const nr = 0; // Not Responding - can be calculated based on last_seen
-
-    return {
-      total: devices.length,
-      moving,
-      idle,
-      parked,
-      nr,
-    };
-  };
-
-  const stats = getVehicleStats();
 
   const handleNavigation = (screen: string) => {
     // Navigate to different screens/tabs
@@ -177,7 +172,7 @@ const Home = () => {
               </View>
               <View className="flex-1">
                 <Text className="text-slate-700 text-base font-JakartaMedium opacity-90">
-                  {getGreeting()}
+                  {greeting}
                 </Text>
                 <Text className="text-slate-900 text-xl font-JakartaBold">
                   {user?.fullName || user?.firstName || "User"}

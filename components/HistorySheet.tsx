@@ -13,7 +13,7 @@ interface HistorySheetProps {
 }
 
 const HistorySheet = ({ deviceId, onClose }: HistorySheetProps) => {
-    const { setHistoricalRoute } = useDeviceStore();
+    const setHistoricalRoute = useDeviceStore((s) => s.setHistoricalRoute);
 
     const [date, setDate] = useState(new Date());
     const [showDatePicker, setShowDatePicker] = useState(false);

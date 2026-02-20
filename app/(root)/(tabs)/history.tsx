@@ -1,23 +1,26 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import {
+import ReactNative, {
   ActivityIndicator,
-  Image,
+  Dimensions,
   Platform,
   ScrollView,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+
+const { StyleSheet } = ReactNative;
+const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { format } from "date-fns";
+import { format, differenceInSeconds } from "date-fns";
 import Mapbox from "@rnmapbox/maps";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import Svg, { Circle, Line, Path, Text as SvgText } from "react-native-svg";
 
 import { fetchAPI } from "@/lib/fetch";
 import { useDeviceStore, useLocationStore } from "@/store";
 import { Device } from "@/types/type";
 import { NavigationArrow } from "@/components/NavigationArrow";
+import { Speedometer } from "@/components/Speedometer";
 
 type RouteFeature = {
   type: "Feature";
@@ -128,100 +131,18 @@ if (accessToken) {
   Mapbox.setAccessToken(accessToken);
 }
 
-const Speedometer = ({ speed = 0, maxSpeed = 200 }: { speed: number; maxSpeed?: number }) => {
-  const size = 90;
-  const strokeWidth = 10;
-  const center = size / 2;
-  const radius = (size - strokeWidth) / 2;
-
-  const startAngle = -180;
-  const endAngle = 0;
-  const totalAngle = endAngle - startAngle;
-
-  const speedPercentage = Math.min(speed / maxSpeed, 1);
-  const needleAngle = startAngle + totalAngle * speedPercentage;
-  const needleRad = (needleAngle * Math.PI) / 180;
-
-  const needleLength = radius - 6;
-  const needleX = center + needleLength * Math.cos(needleRad);
-  const needleY = center + needleLength * Math.sin(needleRad);
-
-  const createArcPath = (startDeg: number, endDeg: number, r: number) => {
-    const start = (startDeg * Math.PI) / 180;
-    const end = (endDeg * Math.PI) / 180;
-    const x1 = center + r * Math.cos(start);
-    const y1 = center + r * Math.sin(start);
-    const x2 = center + r * Math.cos(end);
-    const y2 = center + r * Math.sin(end);
-    const largeArc = endDeg - startDeg > 180 ? 1 : 0;
-    return `M ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2}`;
-  };
-
-  const step = 20;
-  const ticks = Array.from(
-    { length: Math.floor(maxSpeed / step) + 1 },
-    (_, idx) => idx * step
-  );
-
-  return (
-    <View style={{ alignItems: "center" }}>
-      <Svg width={size} height={size}>
-        <Path
-          d={createArcPath(startAngle, endAngle, radius)}
-          stroke="#1E3A52"
-          strokeWidth={strokeWidth}
-          fill="none"
-          strokeLinecap="round"
-        />
-        <Path
-          d={createArcPath(startAngle, needleAngle, radius)}
-          stroke="#5BB8E8"
-          strokeWidth={strokeWidth}
-          fill="none"
-          strokeLinecap="round"
-        />
-        {ticks.map((value) => {
-          const angle = startAngle + totalAngle * (value / maxSpeed);
-          const rad = (angle * Math.PI) / 180;
-          const x = center + (radius - 14) * Math.cos(rad);
-          const y = center + (radius - 14) * Math.sin(rad);
-          return (
-            <SvgText
-              key={value}
-              x={x}
-              y={y}
-              fontSize="8"
-              fill="#A8D8F0"
-              textAnchor="middle"
-              alignmentBaseline="middle"
-            >
-              {value}
-            </SvgText>
-          );
-        })}
-        <Circle cx={center} cy={center} r="3" fill="#333" />
-        <Line
-          x1={center}
-          y1={center}
-          x2={needleX}
-          y2={needleY}
-          stroke="white"
-          strokeWidth="2"
-          strokeLinecap="round"
-        />
-      </Svg>
-    </View>
-  );
-};
-
-const SPEEDOMETER_MAX = 100;
+const SPEEDOMETER_MAX = 120;
 // Set to 1 for km/h; use 3.6 if backend speeds are in m/s.
 const SPEED_DISPLAY_MULTIPLIER = 1;
 
 const History = () => {
   const cameraRef = useRef<Mapbox.Camera>(null);
-  const { userLatitude, userLongitude } = useLocationStore();
-  const { devices, selectedDevice, setSelectedDevice, setDevices } = useDeviceStore();
+  const userLatitude = useLocationStore((s) => s.userLatitude);
+  const userLongitude = useLocationStore((s) => s.userLongitude);
+  const devices = useDeviceStore((s) => s.devices);
+  const selectedDevice = useDeviceStore((s) => s.selectedDevice);
+  const setSelectedDevice = useDeviceStore((s) => s.setSelectedDevice);
+  const setDevices = useDeviceStore((s) => s.setDevices);
 
   const [date, setDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -239,9 +160,12 @@ const History = () => {
   const [isScrubbing, setIsScrubbing] = useState(false);
   const [isScrubbingSpeed, setIsScrubbingSpeed] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  const [controlsExpanded, setControlsExpanded] = useState(true);
   const smoothedCourseRef = useRef<number | null>(null);
   const playbackPositionRef = useRef(0);
   const lastFrameTimeRef = useRef<number | null>(null);
+
+  const routeLoaded = !!(routeData || routeLine);
 
   useEffect(() => {
     if (devices.length > 0 || loading) return;
@@ -396,6 +320,7 @@ const History = () => {
       setPlaybackPosition(0);
       playbackPositionRef.current = 0;
       setIsPlaying(false);
+      setControlsExpanded(false);
     } catch (err) {
       console.error("Failed to load route", err);
       setRouteData(null);
@@ -589,6 +514,45 @@ const History = () => {
     return routeData?.properties?.device_name || current?.name || "Device";
   }, [devices, routeData, selectedDevice]);
 
+  const routeSummary = useMemo(() => {
+    if (!playbackPoints.length) return null;
+    const firstTs = playbackPoints[0].properties?.timestamp;
+    const lastTs = playbackPoints[playbackPoints.length - 1].properties?.timestamp;
+    let durationSec = 0;
+    let startLabel = "";
+    let endLabel = "";
+    if (firstTs && lastTs) {
+      const start = new Date(firstTs);
+      const end = new Date(lastTs);
+      durationSec = differenceInSeconds(end, start);
+      startLabel = format(start, "h:mm a");
+      endLabel = format(end, "h:mm a");
+    }
+    let distanceKm = 0;
+    for (let i = 0; i < playbackPoints.length - 1; i++) {
+      distanceKm += haversineMeters(
+        playbackPoints[i].geometry.coordinates,
+        playbackPoints[i + 1].geometry.coordinates
+      ) / 1000;
+    }
+    const pointCount = playbackPoints.length;
+    const durationLabel = durationSec <= 0
+      ? "—"
+      : durationSec >= 3600
+        ? `${Math.floor(durationSec / 3600)}h ${Math.floor((durationSec % 3600) / 60)}m`
+        : `${Math.floor(durationSec / 60)}m`;
+    return { durationSec, durationLabel, startLabel, endLabel, distanceKm, pointCount };
+  }, [playbackPoints]);
+
+  const currentPlaybackTimeLabel = useMemo(() => {
+    if (!playbackPoints.length || !routeSummary) return "0:00";
+    const index = Math.min(Math.floor(playbackPosition), playbackPoints.length - 1);
+    const ts = playbackPoints[index].properties?.timestamp;
+    if (!ts) return "0:00";
+    const t = new Date(ts);
+    return format(t, "h:mm a");
+  }, [playbackPoints, playbackPosition, routeSummary]);
+
   const handleToggleStyle = () => {
     setMapStyle((prev) =>
       prev.includes("satellite")
@@ -599,6 +563,17 @@ const History = () => {
 
   const handleToggle3D = () => {
     setPitch((prev) => (prev > 0 ? 0 : 60));
+  };
+
+  const handleChangeRoute = () => {
+    setRouteData(null);
+    setRouteLineData(null);
+    setMovingPoints([]);
+    setPlaybackPosition(0);
+    playbackPositionRef.current = 0;
+    setIsPlaying(false);
+    setError(null);
+    setControlsExpanded(true);
   };
 
   if (Platform.OS === "web") {
@@ -612,99 +587,211 @@ const History = () => {
     );
   }
 
-  return (
-    <View className="flex-1" style={{ backgroundColor: "#1A2A3A" }}>
-      <View className="px-5 pt-4 pb-3">
-        <Text className="text-white text-xl font-JakartaBold">History</Text>
-        <Text className="text-gray-400 mt-1 font-JakartaMedium">
-          Select a date to view route history.
-        </Text>
-      </View>
+  const isToday = useMemo(() => {
+    const today = new Date();
+    return date.getDate() === today.getDate() &&
+      date.getMonth() === today.getMonth() &&
+      date.getFullYear() === today.getFullYear();
+  }, [date]);
+  const isYesterday = useMemo(() => {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    return date.getDate() === yesterday.getDate() &&
+      date.getMonth() === yesterday.getMonth() &&
+      date.getFullYear() === yesterday.getFullYear();
+  }, [date]);
+  const dateLabel = isToday ? "Today" : isYesterday ? "Yesterday" : format(date, "EEE, MMM d");
 
-      <View className="px-5 pb-3">
-        <View className="flex-row justify-between items-center mb-3">
-          <View className="flex-1 mr-3">
-            <Text className="text-white font-JakartaMedium mb-2">Device</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {devices.map((device) => {
-                const isActive = device.id === selectedDevice;
-                return (
-                  <TouchableOpacity
-                    key={device.id}
-                    onPress={() => setSelectedDevice(device.id)}
-                    className={`mr-3 px-4 py-2 rounded-full ${isActive ? "text-white" : "text-gray-300"}`}
-                    style={{
-                      backgroundColor: isActive ? "#5BB8E8" : "#243345",
-                    }}
-                  >
-                    <Text className={`font-JakartaMedium ${isActive ? "text-white" : "text-gray-300"}`}>
-                      {device.name}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
+  const showFullControls = !routeLoaded || controlsExpanded;
+
+  return (
+    <View style={styles.screen}>
+      {/* Live Tracking–style top section when route loaded and controls collapsed */}
+      {routeLoaded && !controlsExpanded && (
+        <View style={[styles.trackingTopSection, { height: SCREEN_HEIGHT * 0.30 - 6 }]}>
+          <View style={styles.trackingStatusBarBg} />
+          <View style={styles.trackingInfoContainer}>
+            <View style={styles.trackingLeftIcons}>
+              <View style={styles.trackingIconButton}>
+                <Ionicons name="time-outline" size={20} color="#5BB8E8" />
+                <Text style={styles.trackingIconLabel}>Speed</Text>
+                <Text style={styles.trackingIconStatus}>{playbackSpeed.toFixed(1)}×</Text>
+              </View>
+              <View style={styles.trackingIconButton}>
+                <MaterialCommunityIcons name="map-marker-path" size={20} color="#5BB8E8" />
+                <Text style={styles.trackingIconLabel}>Playback</Text>
+                <Text style={styles.trackingIconStatus}>{isPlaying ? "On" : "Off"}</Text>
+              </View>
+            </View>
+            <View style={styles.trackingSpeedometerContainer}>
+              <Speedometer speed={displaySpeed} maxSpeed={SPEEDOMETER_MAX} size="large" />
+              <Text style={styles.trackingCurrentSpeed}>{displaySpeed.toFixed(0)} KM/H</Text>
+              <View style={styles.trackingDistanceRow}>
+                <MaterialCommunityIcons name="road-variant" size={18} color="#5BB8E8" style={styles.trackingDistanceIcon} />
+                <Text style={styles.trackingTotalDistance}>
+                  {routeSummary ? `${routeSummary.distanceKm.toFixed(1)} km` : "— km"}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.trackingRightInfo}>
+              <View style={styles.trackingStatusCard}>
+                <View style={styles.trackingStatusHeader}>
+                  <Text style={styles.trackingStatusText}>{isPlaying ? "Playing" : "Paused"}</Text>
+                  <Ionicons name={isPlaying ? "play" : "pause"} size={18} color="#5BB8E8" />
+                </View>
+                <Text style={styles.trackingStatusLabel}>M</Text>
+              </View>
+              <View style={styles.trackingInfoCard}>
+                <View style={styles.trackingInfoRow}>
+                  <Text style={styles.trackingInfoDate}>{format(date, "dd-MM-yy")}</Text>
+                  <Ionicons name="calendar-outline" size={16} color="#5BB8E8" />
+                </View>
+                <Text style={styles.trackingInfoLabel}>Time</Text>
+                <Text style={styles.trackingInfoTime}>
+                  {routeSummary ? `${currentPlaybackTimeLabel} → ${routeSummary.endLabel}` : "—"}
+                </Text>
+              </View>
+            </View>
+          </View>
+          <TouchableOpacity
+            style={styles.trackingAddressBar}
+            onPress={handleChangeRoute}
+            activeOpacity={0.9}
+          >
+            <Ionicons name="location" size={18} color="#5BB8E8" />
+            <MaterialCommunityIcons name="road-variant" size={16} color="#5BB8E8" />
+            <Text style={styles.trackingAddressText} numberOfLines={1}>
+              {deviceName} · {dateLabel} · Tap to change route
+            </Text>
+            <Ionicons name="chevron-down" size={18} color="#5BB8E8" />
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Full header + controls: when no route or when expanded */}
+      {showFullControls && (
+        <>
+          <View style={[styles.header, routeLoaded && styles.headerWithDone]}>
+            <View style={styles.headerTextWrap}>
+              <Text style={styles.headerTitle}>Route History</Text>
+              <Text style={styles.headerSubtitle}>Play back past routes by device and date</Text>
+            </View>
+            {routeLoaded && (
+              <TouchableOpacity style={styles.doneButton} onPress={() => setControlsExpanded(false)}>
+                <Text style={styles.doneButtonText}>Done</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
-          <View className="flex-1">
-            <Text className="text-white font-JakartaMedium mb-2">Date</Text>
+          <View style={styles.controlsCard}>
+            <Text style={styles.label}>Device</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.deviceScroll}>
+              {devices.length === 0 ? (
+                <Text style={styles.placeholderText}>No devices</Text>
+              ) : (
+                devices.map((device) => {
+                  const isActive = device.id === selectedDevice;
+                  return (
+                    <TouchableOpacity
+                      key={device.id}
+                      onPress={() => setSelectedDevice(device.id)}
+                      style={[styles.deviceChip, isActive && styles.deviceChipActive]}
+                    >
+                      <Ionicons name="car-outline" size={16} color={isActive ? "#fff" : "#A8D8F0"} style={{ marginRight: 6 }} />
+                      <Text style={[styles.deviceChipText, isActive && styles.deviceChipTextActive]}>
+                        {device.name}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })
+              )}
+            </ScrollView>
+
+            <View style={styles.dateRow}>
+              <View style={styles.dateBlock}>
+                <Text style={styles.label}>Date</Text>
+                <TouchableOpacity
+                  onPress={() => setShowDatePicker(true)}
+                  style={[styles.dateButton, routeData && styles.dateButtonSuccess]}
+                >
+                  <Ionicons name="calendar-outline" size={18} color="#5BB8E8" style={{ marginRight: 8 }} />
+                  <Text style={styles.dateButtonText}>{dateLabel}</Text>
+                  <Text style={styles.dateYear}>{format(date, "yyyy")}</Text>
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity
+                onPress={() => setShowDatePicker(true)}
+                style={styles.quickDate}
+              >
+                <Text style={styles.quickDateText}>Pick date</Text>
+              </TouchableOpacity>
+            </View>
+
+            {showDatePicker && (
+              <DateTimePicker
+                value={date}
+                mode="date"
+                display="default"
+                onChange={(event, selectedDate) => {
+                  setShowDatePicker(false);
+                  if (selectedDate) setDate(selectedDate);
+                }}
+              />
+            )}
+
+            {error && (
+              <View style={styles.errorCard}>
+                <Ionicons name="warning-outline" size={20} color="#F87171" />
+                <Text style={styles.errorText}>{error}</Text>
+                <TouchableOpacity onPress={() => { setError(null); handleLoadRoute(); }} style={styles.retryButton}>
+                  <Text style={styles.retryButtonText}>Retry</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
             <TouchableOpacity
-              onPress={() => setShowDatePicker(true)}
-              className="bg-[#243345] px-4 py-3 rounded-xl"
-              style={{
-                borderWidth: 2,
-                borderColor: routeData ? "#5BB8E8" : "transparent",
-              }}
+              onPress={handleLoadRoute}
+              disabled={loading}
+              style={[styles.loadButton, loading && styles.loadButtonDisabled]}
             >
-              <Text className="text-gray-200 font-JakartaMedium">
-                {format(date, "MMM dd")}
-              </Text>
+              {loading ? (
+                <>
+                  <ActivityIndicator size="small" color="#fff" style={{ marginRight: 10 }} />
+                  <Text style={styles.loadButtonText}>Loading route…</Text>
+                </>
+              ) : (
+                <>
+                  <Ionicons name="play-circle-outline" size={22} color="#fff" style={{ marginRight: 8 }} />
+                  <Text style={styles.loadButtonText}>Load route</Text>
+                </>
+              )}
             </TouchableOpacity>
           </View>
-        </View>
+        </>
+      )}
 
-        {showDatePicker && (
-          <DateTimePicker
-            value={date}
-            mode="date"
-            display="default"
-            onChange={(event, selectedDate) => {
-              setShowDatePicker(false);
-              if (selectedDate) {
-                setDate(selectedDate);
-              }
-            }}
-          />
-        )}
-
-        {error && (
-          <Text className="text-red-400 mt-2 font-JakartaMedium">
-            {error}
-          </Text>
-        )}
-
-        <TouchableOpacity
-          onPress={handleLoadRoute}
-          disabled={loading}
-          className="mt-4 w-full py-4 rounded-full flex items-center justify-center"
-          style={{
-            backgroundColor: loading ? "#666" : "#5BB8E8",
-          }}
-        >
-          <Text className="text-white text-lg font-JakartaBold">
-            {loading ? "Loading..." : "Load Route"}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      <View className="flex-1">
+      <View
+        style={[
+          styles.mapContainer,
+          routeLoaded && !controlsExpanded && styles.mapContainerTracking,
+        ]}
+      >
         {loading && !routeData ? (
-          <View className="flex-1 items-center justify-center">
+          <View style={styles.loadingOverlay}>
             <ActivityIndicator size="large" color="#5BB8E8" />
+            <Text style={styles.loadingText}>Loading route data…</Text>
+          </View>
+        ) : !routeData && !routeLine ? (
+          <View style={styles.emptyState}>
+            <View style={styles.emptyIconWrap}>
+              <MaterialCommunityIcons name="map-marker-path" size={48} color="#5BB8E8" />
+            </View>
+            <Text style={styles.emptyTitle}>No route loaded</Text>
+            <Text style={styles.emptySubtitle}>Choose a device and date, then tap "Load route" to see playback</Text>
           </View>
         ) : (
           <Mapbox.MapView
-            style={{ flex: 1 }}
+            style={styles.map}
             styleURL={mapStyle}
             compassEnabled
             scaleBarEnabled={false}
@@ -772,221 +859,413 @@ const History = () => {
           </Mapbox.MapView>
         )}
 
-        <View
-          style={{
-            position: "absolute",
-            top: 16,
-            right: 16,
-            backgroundColor: "rgba(26, 42, 58, 0.9)",
-            borderRadius: 14,
-            padding: 10,
-            alignItems: "center",
-            borderWidth: 1,
-            borderColor: "#5BB8E8",
-          }}
-        >
-          <Speedometer speed={displaySpeed} maxSpeed={SPEEDOMETER_MAX} />
-          <Text
-            style={{
-              color: "white",
-              fontWeight: "700",
-              marginTop: 6,
-              fontSize: 12,
-              textAlign: "center",
-              width: "100%",
-            }}
-          >
-            {displaySpeed.toFixed(0)} KM/H
-          </Text>
-        </View>
+        {routeLoaded && controlsExpanded && (
+          <View style={[styles.speedCard, styles.speedCardCompact]}>
+            <Text style={styles.speedCardLabel}>Speed</Text>
+            <Speedometer speed={displaySpeed} maxSpeed={SPEEDOMETER_MAX} size="small" />
+            <Text style={styles.speedCardValue}>{displaySpeed.toFixed(0)} km/h</Text>
+          </View>
+        )}
 
-        <View
-          style={{
-            position: "absolute",
-            left: 16,
-            right: 16,
-            bottom: 16,
-            padding: 12,
-            borderRadius: 16,
-            backgroundColor: "rgba(17, 30, 44, 0.95)",
-            borderWidth: 1,
-            borderColor: "#5BB8E8",
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 12,
-          }}
-        >
+        {routeLoaded && (
+          <View style={[styles.playbackBar, !controlsExpanded && styles.playbackBarCompact]}>
           <TouchableOpacity
             onPress={() => {
-              if (playbackPosition >= Math.max(playbackPoints.length - 1, 0)) {
+              if (playbackPoints.length && playbackPosition >= playbackPoints.length - 1) {
                 playbackPositionRef.current = 0;
                 setPlaybackPosition(0);
               }
               setIsPlaying((prev) => !prev);
             }}
             disabled={!playbackPoints.length}
-            style={{
-              width: 64,
-              height: 64,
-              borderRadius: 12,
-              backgroundColor: "#0A63A8",
-              alignItems: "center",
-              justifyContent: "center",
-              opacity: playbackPoints.length ? 1 : 0.6,
-            }}
+            style={[
+              styles.playButton,
+              !controlsExpanded && styles.playButtonCompact,
+              !playbackPoints.length && styles.playButtonDisabled,
+            ]}
           >
-            <Ionicons name={isPlaying ? "pause" : "play"} size={30} color="white" />
+            <Ionicons
+              name={playbackPosition >= Math.max(playbackPoints.length - 1, 0) && !isPlaying ? "play-skip-back" : isPlaying ? "pause" : "play"}
+              size={controlsExpanded ? 28 : 24}
+              color="white"
+            />
           </TouchableOpacity>
 
-          <View style={{ flex: 1, gap: 12 }}>
-            <View>
-              <Text style={{ color: "white", fontSize: 12, marginBottom: 6 }}>
-                Speed
-              </Text>
-              <View
-                style={{ height: 6, borderRadius: 3, backgroundColor: "#243345" }}
-                onLayout={(event) => setSpeedWidth(event.nativeEvent.layout.width)}
-                onStartShouldSetResponder={() => true}
-                onResponderGrant={(event) => {
-                  setIsScrubbingSpeed(true);
-                  handleSpeedTouch(event.nativeEvent.locationX);
-                }}
-                onResponderMove={(event) => handleSpeedTouch(event.nativeEvent.locationX)}
-                onResponderRelease={() => setIsScrubbingSpeed(false)}
-              >
-                <View
-                  style={{
-                    position: "absolute",
-                    left: 0,
-                    top: 0,
-                    bottom: 0,
-                    width: `${speedProgress * 100}%`,
-                    backgroundColor: "#5BB8E8",
-                    borderRadius: 3,
-                  }}
-                />
-                <View
-                  style={{
-                    position: "absolute",
-                    left: `${speedProgress * 100}%`,
-                    top: -5,
-                    width: 16,
-                    height: 16,
-                    borderRadius: 8,
-                    backgroundColor: "#5BB8E8",
-                    borderWidth: 2,
-                    borderColor: "white",
-                    transform: [{ translateX: -8 }],
-                  }}
-                />
+          <View style={styles.playbackSliders}>
+            <View style={styles.sliderBlock}>
+              <View style={styles.sliderHeader}>
+                <Text style={styles.sliderLabel}>Progress</Text>
+                {routeSummary && routeSummary.endLabel ? (
+                  <Text style={styles.sliderTime}>
+                    {currentPlaybackTimeLabel} → {routeSummary.endLabel}
+                  </Text>
+                ) : null}
               </View>
-              <Text style={{ color: isScrubbingSpeed ? "#5BB8E8" : "#A8D8F0", fontSize: 11, marginTop: 6 }}>
-                {playbackSpeed.toFixed(1)}x
-              </Text>
-            </View>
-
-            <View>
-              <Text style={{ color: "white", fontSize: 12, marginBottom: 6 }}>
-                Progress
-              </Text>
               <View
-                style={{ height: 6, borderRadius: 3, backgroundColor: "#243345" }}
-                onLayout={(event) => setProgressWidth(event.nativeEvent.layout.width)}
+                style={styles.sliderTrack}
+                onLayout={(e) => setProgressWidth(e.nativeEvent.layout.width)}
                 onStartShouldSetResponder={() => true}
-                onResponderGrant={(event) => {
-                  setIsScrubbing(true);
-                  handleProgressTouch(event.nativeEvent.locationX);
-                }}
-                onResponderMove={(event) => handleProgressTouch(event.nativeEvent.locationX)}
+                onResponderGrant={(e) => { setIsScrubbing(true); handleProgressTouch(e.nativeEvent.locationX); }}
+                onResponderMove={(e) => handleProgressTouch(e.nativeEvent.locationX)}
                 onResponderRelease={() => setIsScrubbing(false)}
               >
-                <View
-                  style={{
-                    position: "absolute",
-                    left: 0,
-                    top: 0,
-                    bottom: 0,
-                    width: `${playbackProgress * 100}%`,
-                    backgroundColor: "#5BB8E8",
-                    borderRadius: 3,
-                  }}
-                />
-                <View
-                  style={{
-                    position: "absolute",
-                    left: `${playbackProgress * 100}%`,
-                    top: -5,
-                    width: 16,
-                    height: 16,
-                    borderRadius: 8,
-                    backgroundColor: "#5BB8E8",
-                    borderWidth: 2,
-                    borderColor: "white",
-                    transform: [{ translateX: -8 }],
-                    opacity: playbackPoints.length ? 1 : 0.5,
-                  }}
-                />
+                <View style={[styles.sliderFill, { width: `${playbackProgress * 100}%` }]} />
+                <View style={[styles.sliderThumb, { left: `${playbackProgress * 100}%` }]} />
               </View>
-              <Text style={{ color: isScrubbing ? "#5BB8E8" : "#A8D8F0", fontSize: 11, marginTop: 6 }}>
-                {isScrubbing ? "Scrubbing" : "Playback"}
-              </Text>
+            </View>
+            <View style={styles.sliderBlock}>
+              <Text style={styles.sliderLabel}>Playback speed</Text>
+              <View
+                style={styles.sliderTrack}
+                onLayout={(e) => setSpeedWidth(e.nativeEvent.layout.width)}
+                onStartShouldSetResponder={() => true}
+                onResponderGrant={(e) => { setIsScrubbingSpeed(true); handleSpeedTouch(e.nativeEvent.locationX); }}
+                onResponderMove={(e) => handleSpeedTouch(e.nativeEvent.locationX)}
+                onResponderRelease={() => setIsScrubbingSpeed(false)}
+              >
+                <View style={[styles.sliderFill, { width: `${speedProgress * 100}%` }]} />
+                <View style={[styles.sliderThumb, { left: `${speedProgress * 100}%` }]} />
+              </View>
+              <Text style={[styles.sliderValue, isScrubbingSpeed && styles.sliderValueActive]}>{playbackSpeed.toFixed(1)}×</Text>
             </View>
           </View>
         </View>
+        )}
 
-        <View
-          style={{
-            position: "absolute",
-            left: 16,
-            top: 16,
-            gap: 10,
-          }}
-        >
-          <TouchableOpacity
-            onPress={handleToggleStyle}
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: 22,
-              backgroundColor: "rgba(26, 42, 58, 0.9)",
-              borderWidth: 2,
-              borderColor: "#5BB8E8",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
+        <View style={[styles.mapControls, routeLoaded && !controlsExpanded && styles.mapControlsTracking]}>
+          <TouchableOpacity onPress={handleToggleStyle} style={styles.mapControlBtn}>
             <MaterialCommunityIcons name="layers" size={22} color="#5BB8E8" />
           </TouchableOpacity>
-          <TouchableOpacity
-            onPress={handleToggle3D}
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: 22,
-              backgroundColor: "rgba(26, 42, 58, 0.9)",
-              borderWidth: 2,
-              borderColor: "#5BB8E8",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <MaterialCommunityIcons name={pitch > 0 ? "axis-z-rotate-clockwise" : "axis-z-rotate-clockwise"} size={22} color="#5BB8E8" />
+          <TouchableOpacity onPress={handleToggle3D} style={styles.mapControlBtn}>
+            <MaterialCommunityIcons name="cube-outline" size={22} color="#5BB8E8" />
           </TouchableOpacity>
         </View>
+        {routeLoaded && !controlsExpanded && (
+          <TouchableOpacity style={styles.trackingRightMenuButton} onPress={handleChangeRoute}>
+            <Ionicons name="ellipsis-vertical" size={24} color="white" />
+          </TouchableOpacity>
+        )}
       </View>
 
-      <View className="px-5 py-4" style={{ backgroundColor: "#111E2C" }}>
-        <Text className="text-white font-JakartaBold">{deviceName}</Text>
-        <Text className="text-gray-400 mt-1 font-JakartaMedium">
-          {routeData?.properties?.start_time || ""}
-          {routeData?.properties?.end_time ? ` → ${routeData.properties.end_time}` : ""}
-        </Text>
-        <Text className="text-gray-400 mt-1 font-JakartaMedium">
-          Points: {routeData?.properties?.point_count ?? routeData?.features?.length ?? 0}
-        </Text>
+      <View style={[styles.infoStrip, routeLoaded && !controlsExpanded && styles.infoStripCompact]}>
+        <View style={styles.infoStripMain}>
+          <Text style={[styles.infoStripTitle, routeLoaded && !controlsExpanded && styles.infoStripTitleCompact]} numberOfLines={1}>
+            {deviceName}
+          </Text>
+          {routeLoaded && !controlsExpanded && routeSummary ? (
+            <Text style={styles.infoStripMetaText} numberOfLines={1}>
+              {routeSummary.startLabel} – {routeSummary.endLabel} · {routeSummary.durationLabel} · {routeSummary.distanceKm.toFixed(1)} km
+            </Text>
+          ) : routeSummary ? (
+            <View style={styles.infoStripMeta}>
+              <Text style={styles.infoStripMetaText}>
+                {routeSummary.startLabel} – {routeSummary.endLabel}
+              </Text>
+              <Text style={styles.infoStripMetaText}>
+                Duration {routeSummary.durationLabel} · {routeSummary.distanceKm.toFixed(1)} km · {routeSummary.pointCount} points
+              </Text>
+            </View>
+          ) : (
+            (routeData?.properties?.start_time || routeData?.properties?.end_time) ? (
+              <Text style={styles.infoStripMetaText}>
+                {routeData.properties.start_time || ""}
+                {routeData.properties.end_time ? ` → ${routeData.properties.end_time}` : ""}
+              </Text>
+            ) : (
+              <Text style={styles.infoStripMetaText}>
+                {routeData?.features?.length ?? 0} points
+              </Text>
+            )
+          )}
+        </View>
       </View>
     </View>
   );
 };
+
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: "#1A2A3A" },
+  compactBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: "rgba(17, 30, 44, 0.96)",
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(91, 184, 232, 0.25)",
+  },
+  compactBarTitle: { fontSize: 14, color: "#E2E8F0", flex: 1, marginRight: 12, fontFamily: "Jakarta-SemiBold" },
+  compactBarBadge: { flexDirection: "row", alignItems: "center", gap: 4 },
+  compactBarBadgeText: { fontSize: 13, color: "#5BB8E8", fontFamily: "Jakarta-Medium" },
+  trackingTopSection: { backgroundColor: "#1A2A3A", paddingTop: 0 },
+  trackingStatusBarBg: {
+    height: 40,
+    backgroundColor: "#5BB8E8",
+    opacity: 0.85,
+  },
+  trackingInfoContainer: {
+    flexDirection: "row",
+    paddingHorizontal: 12,
+    paddingTop: 6,
+    paddingBottom: 6,
+  },
+  trackingLeftIcons: { width: 70, justifyContent: "space-around" },
+  trackingIconButton: { alignItems: "center", marginBottom: 4 },
+  trackingIconLabel: { fontSize: 9, color: "#5BB8E8", marginTop: 2, fontWeight: "600" },
+  trackingIconStatus: { fontSize: 9, color: "white", marginTop: 1, fontWeight: "600" },
+  trackingSpeedometerContainer: {
+    flex: 1,
+    alignItems: "center",
+    paddingTop: 0,
+    marginTop: -2,
+    paddingBottom: 0,
+  },
+  trackingDistanceRow: { flexDirection: "row", alignItems: "center", marginTop: 0 },
+  trackingDistanceIcon: { marginRight: 6 },
+  trackingTotalDistance: { fontSize: 14, fontWeight: "600", color: "white" },
+  trackingCurrentSpeed: { fontSize: 20, fontWeight: "bold", color: "white", marginTop: -2 },
+  trackingRightInfo: { width: 100, justifyContent: "flex-start", gap: 4 },
+  trackingStatusCard: {
+    backgroundColor: "rgba(30, 58, 82, 0.6)",
+    borderRadius: 8,
+    padding: 6,
+    borderWidth: 1,
+    borderColor: "#5BB8E8",
+    marginBottom: 2,
+  },
+  trackingStatusHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  trackingStatusText: { color: "#5BB8E8", fontSize: 12, fontWeight: "600" },
+  trackingStatusLabel: { color: "white", fontSize: 12, fontWeight: "bold", marginTop: 4 },
+  trackingInfoCard: {
+    backgroundColor: "rgba(30, 58, 82, 0.6)",
+    borderRadius: 8,
+    padding: 6,
+    borderWidth: 1,
+    borderColor: "#5BB8E8",
+    marginBottom: 2,
+  },
+  trackingInfoRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  trackingInfoDate: { color: "white", fontSize: 9, fontWeight: "600" },
+  trackingInfoLabel: { color: "#A8D8F0", fontSize: 11, marginTop: 2 },
+  trackingInfoTime: { color: "white", fontSize: 11, fontWeight: "600", marginTop: 2 },
+  trackingAddressBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(30, 58, 82, 0.8)",
+    borderRadius: 10,
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+    marginHorizontal: 12,
+    marginTop: 2,
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: "#5BB8E8",
+  },
+  trackingAddressText: { flex: 1, color: "#A8D8F0", fontSize: 10, marginLeft: 4, lineHeight: 14 },
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(91, 184, 232, 0.2)",
+  },
+  headerWithDone: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  headerTextWrap: { flex: 1 },
+  headerTitle: { fontSize: 22, fontWeight: "700", color: "#fff", fontFamily: "Jakarta-Bold" },
+  headerSubtitle: { fontSize: 13, color: "#A8D8F0", marginTop: 2, fontFamily: "Jakarta-Medium" },
+  doneButton: { paddingVertical: 8, paddingHorizontal: 14 },
+  doneButtonText: { fontSize: 16, color: "#5BB8E8", fontFamily: "Jakarta-SemiBold" },
+  controlsCard: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: "rgba(17, 30, 44, 0.6)",
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(91, 184, 232, 0.15)",
+  },
+  label: { fontSize: 12, color: "#A8D8F0", marginBottom: 8, fontFamily: "Jakarta-Medium" },
+  deviceScroll: { marginBottom: 14, maxHeight: 44 },
+  deviceChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 22,
+    backgroundColor: "#243345",
+    marginRight: 10,
+  },
+  deviceChipActive: { backgroundColor: "#5BB8E8" },
+  deviceChipText: { fontSize: 14, color: "#A8D8F0", fontFamily: "Jakarta-Medium" },
+  deviceChipTextActive: { color: "#fff" },
+  placeholderText: { fontSize: 14, color: "#64748b", fontFamily: "Jakarta-Medium" },
+  dateRow: { flexDirection: "row", alignItems: "flex-end", gap: 12 },
+  dateBlock: { flex: 1 },
+  dateButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#243345",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: "transparent",
+  },
+  dateButtonSuccess: { borderColor: "#5BB8E8" },
+  dateButtonText: { fontSize: 15, color: "#E2E8F0", fontFamily: "Jakarta-Medium", flex: 1 },
+  dateYear: { fontSize: 12, color: "#94A3B8" },
+  quickDate: { paddingVertical: 12, paddingHorizontal: 12, justifyContent: "center" },
+  quickDateText: { fontSize: 14, color: "#5BB8E8", fontFamily: "Jakarta-Medium" },
+  errorCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(248, 113, 113, 0.12)",
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: "rgba(248, 113, 113, 0.3)",
+    gap: 10,
+  },
+  errorText: { flex: 1, color: "#FCA5A5", fontSize: 13, fontFamily: "Jakarta-Medium" },
+  retryButton: { paddingVertical: 6, paddingHorizontal: 12, backgroundColor: "#5BB8E8", borderRadius: 8 },
+  retryButtonText: { color: "#fff", fontSize: 13, fontFamily: "Jakarta-SemiBold" },
+  loadButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#5BB8E8",
+    paddingVertical: 14,
+    borderRadius: 14,
+    marginTop: 16,
+  },
+  loadButtonDisabled: { backgroundColor: "#475569", opacity: 0.9 },
+  loadButtonText: { color: "#fff", fontSize: 17, fontFamily: "Jakarta-Bold" },
+  mapContainer: { flex: 1, position: "relative" },
+  mapContainerMax: { minHeight: 0 },
+  mapContainerTracking: { position: "relative" },
+  map: { flex: 1 },
+  loadingOverlay: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#1A2A3A" },
+  loadingText: { color: "#A8D8F0", marginTop: 12, fontSize: 14, fontFamily: "Jakarta-Medium" },
+  emptyState: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 32,
+    backgroundColor: "#1A2A3A",
+  },
+  emptyIconWrap: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "rgba(91, 184, 232, 0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+  },
+  emptyTitle: { fontSize: 18, fontWeight: "700", color: "#E2E8F0", marginBottom: 8, fontFamily: "Jakarta-Bold" },
+  emptySubtitle: { fontSize: 14, color: "#94A3B8", textAlign: "center", lineHeight: 20, fontFamily: "Jakarta-Medium" },
+  speedCard: {
+    position: "absolute",
+    top: 16,
+    right: 16,
+    backgroundColor: "rgba(17, 30, 44, 0.95)",
+    borderRadius: 16,
+    padding: 12,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#5BB8E8",
+    minWidth: 100,
+  },
+  speedCardLabel: { fontSize: 10, color: "#A8D8F0", marginBottom: 4, fontFamily: "Jakarta-Medium" },
+  speedCardValue: { color: "#fff", fontWeight: "700", fontSize: 13, marginTop: 4 },
+  speedCardCompact: {
+    padding: 8,
+    minWidth: 72,
+  },
+  speedCardValueCompact: { color: "#fff", fontWeight: "700", fontSize: 14 },
+  playbackBar: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    bottom: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: "rgba(17, 30, 44, 0.96)",
+    borderWidth: 1,
+    borderColor: "#5BB8E8",
+  },
+  playButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 14,
+    backgroundColor: "#0A63A8",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  playButtonDisabled: { opacity: 0.5 },
+  playbackBarCompact: { padding: 10, paddingVertical: 10, gap: 10 },
+  playButtonCompact: { width: 48, height: 48, borderRadius: 12 },
+  playbackSliders: { flex: 1, gap: 14 },
+  sliderBlock: { gap: 4 },
+  sliderHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  sliderLabel: { fontSize: 11, color: "#94A3B8", fontFamily: "Jakarta-Medium" },
+  sliderTime: { fontSize: 10, color: "#A8D8F0", fontFamily: "Jakarta-Medium" },
+  sliderValue: { fontSize: 11, color: "#94A3B8", marginTop: 2, fontFamily: "Jakarta-Medium" },
+  sliderValueActive: { color: "#5BB8E8" },
+  sliderTrack: { height: 8, borderRadius: 4, backgroundColor: "#243345", position: "relative", justifyContent: "center" },
+  sliderFill: { position: "absolute", left: 0, top: 0, bottom: 0, backgroundColor: "#5BB8E8", borderRadius: 4 },
+  sliderThumb: {
+    position: "absolute",
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: "#5BB8E8",
+    borderWidth: 2,
+    borderColor: "#fff",
+    marginLeft: -9,
+    top: -5,
+  },
+  mapControls: { position: "absolute", left: 16, top: 16, gap: 10 },
+  mapControlBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(17, 30, 44, 0.92)",
+    borderWidth: 2,
+    borderColor: "#5BB8E8",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  mapControlsTracking: { left: 15, top: 20, gap: 12 },
+  trackingRightMenuButton: {
+    position: "absolute",
+    right: 15,
+    bottom: 100,
+    width: 45,
+    height: 45,
+    borderRadius: 22.5,
+    backgroundColor: "#5BB8E8",
+    borderWidth: 2,
+    borderColor: "#5BB8E8",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  infoStrip: {
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    backgroundColor: "#111E2C",
+    borderTopWidth: 1,
+    borderTopColor: "rgba(91, 184, 232, 0.2)",
+  },
+  infoStripMain: { gap: 4 },
+  infoStripTitle: { fontSize: 16, fontWeight: "700", color: "#fff", fontFamily: "Jakarta-Bold" },
+  infoStripMeta: { gap: 2 },
+  infoStripMetaText: { fontSize: 12, color: "#94A3B8", fontFamily: "Jakarta-Medium" },
+  infoStripCompact: { paddingVertical: 8, paddingHorizontal: 16 },
+  infoStripTitleCompact: { fontSize: 14 },
+});
 
 export default History;

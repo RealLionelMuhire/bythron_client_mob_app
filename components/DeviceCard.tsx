@@ -5,7 +5,7 @@ import { formatDistanceToNow } from "date-fns";
 import { icons } from "@/constants";
 import { DeviceCardProps } from "@/types/type";
 
-const DeviceCard = ({ item, selected, setSelected, onHistoryPress }: DeviceCardProps) => {
+const DeviceCardComponent = ({ item, selected, setSelected, onHistoryPress }: DeviceCardProps) => {
     const isOnline = item.status === 'online';
     const lastSeenText = item.last_seen
         ? formatDistanceToNow(new Date(item.last_seen), { addSuffix: true })
@@ -56,4 +56,4 @@ const DeviceCard = ({ item, selected, setSelected, onHistoryPress }: DeviceCardP
     );
 };
 
-export default DeviceCard;
+export default React.memo(DeviceCardComponent);

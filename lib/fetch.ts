@@ -1,4 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+
+const CACHE_TTL_MS = 30_000; // 30 seconds
+const cache = new Map<string, { data: unknown; at: number }>();
 
 export const fetchAPI = async (url: string, options?: RequestInit) => {
   try {
@@ -35,24 +38,37 @@ export const useFetch = <T>(url: string, options?: RequestInit) => {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (bypassCache = false) => {
     setLoading(true);
     setError(null);
 
+    if (!bypassCache) {
+      const hit = cache.get(url);
+      if (hit && Date.now() - hit.at < CACHE_TTL_MS) {
+        setData(hit.data as T);
+        setLoading(false);
+        return;
+      }
+    }
+
     try {
-      const result = await fetchAPI(url, options);
-      setData(result);
+      const result = await fetchAPI(url, optionsRef.current);
+      cache.set(url, { data: result, at: Date.now() });
+      setData(result as T);
     } catch (err) {
       setError((err as Error).message);
     } finally {
       setLoading(false);
     }
-  }, [url, options]);
+  }, [url]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  return { data, loading, error, refetch: fetchData };
+  const refetch = useCallback(() => fetchData(true), [fetchData]);
+  return { data, loading, error, refetch };
 };

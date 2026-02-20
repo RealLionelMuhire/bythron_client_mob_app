@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
 import { View, Text, ActivityIndicator, StyleSheet, TouchableOpacity, Platform, Dimensions } from "react-native";
-import Svg, { Circle, Line, Text as SvgText, G, Path } from "react-native-svg";
 import Mapbox from "@rnmapbox/maps";
 import { useDeviceStore, useLocationStore } from "@/store";
 import { Device } from "@/types/type";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { startLocationPolling } from "@/lib/liveTracking";
+import { Speedometer } from "@/components/Speedometer";
 
 const { height } = Dimensions.get("window");
 
@@ -15,107 +15,13 @@ if (accessToken) {
   Mapbox.setAccessToken(accessToken);
 }
 
-// Speedometer Component
-const Speedometer = ({ speed = 0, maxSpeed = 200 }: { speed: number; maxSpeed?: number }) => {
-  const size = 140;
-  const strokeWidth = 12;
-  const center = size / 2;
-  const radius = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
-
-  // Speed arc (half circle)
-  const startAngle = -180;
-  const endAngle = 0;
-  const totalAngle = endAngle - startAngle;
-  
-  // Calculate needle angle based on speed
-  const speedPercentage = Math.min(speed / maxSpeed, 1);
-  const needleAngle = startAngle + (totalAngle * speedPercentage);
-  const needleRad = (needleAngle * Math.PI) / 180;
-  
-  // Needle coordinates
-  const needleLength = radius - 10;
-  const needleX = center + needleLength * Math.cos(needleRad);
-  const needleY = center + needleLength * Math.sin(needleRad);
-
-  // Create arc path for the gauge background
-  const createArcPath = (startDeg: number, endDeg: number, r: number) => {
-    const start = (startDeg * Math.PI) / 180;
-    const end = (endDeg * Math.PI) / 180;
-    const x1 = center + r * Math.cos(start);
-    const y1 = center + r * Math.sin(start);
-    const x2 = center + r * Math.cos(end);
-    const y2 = center + r * Math.sin(end);
-    const largeArc = endDeg - startDeg > 180 ? 1 : 0;
-    return `M ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2}`;
-  };
-
-  return (
-    <View style={{ alignItems: "center" }}>
-      <Svg width={size} height={size}>
-        {/* Background arc */}
-        <Path
-          d={createArcPath(startAngle, endAngle, radius)}
-          stroke="#1E3A52"
-          strokeWidth={strokeWidth}
-          fill="none"
-          strokeLinecap="round"
-        />
-        
-        {/* Active speed arc (blue gradient effect) */}
-        <Path
-          d={createArcPath(startAngle, needleAngle, radius)}
-          stroke="#5BB8E8"
-          strokeWidth={strokeWidth}
-          fill="none"
-          strokeLinecap="round"
-        />
-
-        {/* Speed markers */}
-        {[0, 50, 100, 150, 200].map((value, index) => {
-          const angle = startAngle + (totalAngle * (value / maxSpeed));
-          const rad = (angle * Math.PI) / 180;
-          const x = center + (radius - 20) * Math.cos(rad);
-          const y = center + (radius - 20) * Math.sin(rad);
-          
-          return (
-            <SvgText
-              key={value}
-              x={x}
-              y={y}
-              fontSize="10"
-              fill="#A8D8F0"
-              textAnchor="middle"
-              alignmentBaseline="middle"
-            >
-              {value}
-            </SvgText>
-          );
-        })}
-
-        {/* Center dot */}
-        <Circle cx={center} cy={center} r="4" fill="#333" />
-        
-        {/* Needle */}
-        <Line
-          x1={center}
-          y1={center}
-          x2={needleX}
-          y2={needleY}
-          stroke="white"
-          strokeWidth="3"
-          strokeLinecap="round"
-        />
-        <Circle cx={center} cy={center} r="6" fill="white" />
-        <Circle cx={center} cy={center} r="3" fill="#5BB8E8" />
-      </Svg>
-    </View>
-  );
-};
-
 const Tracking = () => {
-  const { devices, currentLocation, setCurrentLocation } = useDeviceStore();
-  const { userLatitude, userLongitude, userAddress } = useLocationStore();
+  const devices = useDeviceStore((s) => s.devices);
+  const currentLocation = useDeviceStore((s) => s.currentLocation);
+  const setCurrentLocation = useDeviceStore((s) => s.setCurrentLocation);
+  const userLatitude = useLocationStore((s) => s.userLatitude);
+  const userLongitude = useLocationStore((s) => s.userLongitude);
+  const userAddress = useLocationStore((s) => s.userAddress);
   const cameraRef = useRef<Mapbox.Camera>(null);
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [mapStyle, setMapStyle] = useState(
@@ -276,8 +182,8 @@ const Tracking = () => {
 
   return (
     <View className="flex-1" style={{ backgroundColor: "#1A2A3A" }}>
-      {/* Top Info Section - 1/3 of screen */}
-      <View style={[styles.topSection, { height: height * 0.38 }]}>
+      {/* Top Info Section - trimmed to reduce blank space */}
+      <View style={[styles.topSection, { height: height * 0.32 }]}>
         {/* Status Bar Background */}
         <View style={styles.statusBarBg} />
         
@@ -303,9 +209,12 @@ const Tracking = () => {
 
           {/* Center - Speedometer */}
           <View style={styles.speedometerContainer}>
-            <Speedometer speed={speed} maxSpeed={200} />
-            <Text style={styles.totalDistance}>{totalDistance.toFixed(2)} KM</Text>
-            <Text style={styles.currentSpeed}>{speed.toFixed(2)} KM/H</Text>
+            <Speedometer speed={speed} maxSpeed={120} size="large" />
+            <Text style={styles.currentSpeed}>{speed.toFixed(0)} KM/H</Text>
+            <View style={styles.distanceRow}>
+              <MaterialCommunityIcons name="road-variant" size={18} color="#5BB8E8" style={styles.distanceIcon} />
+              <Text style={styles.totalDistance}>{totalDistance.toFixed(1)} km</Text>
+            </View>
           </View>
 
           {/* Right Side - Status Info */}
@@ -339,8 +248,8 @@ const Tracking = () => {
         </View>
       </View>
 
-      {/* Map Section - 2/3 of screen */}
-      <View style={[styles.mapSection, { height: height * 0.62 }]}>
+      {/* Map Section - fills rest below top bar */}
+      <View style={[styles.mapSection, { flex: 1 }]}>
         <Mapbox.MapView
           style={styles.map}
           styleURL={mapStyle}
@@ -417,15 +326,15 @@ const styles = StyleSheet.create({
     paddingTop: 0,
   },
   statusBarBg: {
-    height: 50,
+    height: 40,
     backgroundColor: "#E04848",
     opacity: 0.8,
   },
   infoContainer: {
     flexDirection: "row",
-    paddingHorizontal: 15,
-    paddingTop: 10,
-    paddingBottom: 10,
+    paddingHorizontal: 12,
+    paddingTop: 6,
+    paddingBottom: 6,
   },
   leftIcons: {
     width: 70,
@@ -451,13 +360,21 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     paddingTop: 0,
-    marginTop: -6,
+    marginTop: -2,
+    paddingBottom: 0,
+  },
+  distanceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 0,
+  },
+  distanceIcon: {
+    marginRight: 6,
   },
   totalDistance: {
     fontSize: 14,
-    fontWeight: "bold",
+    fontWeight: "600",
     color: "white",
-    marginTop: -9,
   },
   currentSpeed: {
     fontSize: 20,
@@ -527,12 +444,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "rgba(30, 58, 82, 0.8)",
-    borderRadius: 12,
-    paddingVertical: 6,
+    borderRadius: 10,
+    paddingVertical: 5,
     paddingHorizontal: 8,
-    marginHorizontal: 15,
+    marginHorizontal: 12,
     marginTop: 2,
-    marginBottom: 2,
+    marginBottom: 4,
     borderWidth: 1,
     borderColor: "#5BB8E8",
   },

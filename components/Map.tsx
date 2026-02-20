@@ -11,18 +11,13 @@ if (accessToken) {
   Mapbox.setAccessToken(accessToken);
 }
 
-const Map = () => {
-  const {
-    userLongitude,
-    userLatitude,
-  } = useLocationStore();
-
-  const {
-    devices,
-    selectedDevice,
-    currentLocation,
-    historicalRoute
-  } = useDeviceStore();
+const MapComponent = () => {
+  const userLongitude = useLocationStore((s) => s.userLongitude);
+  const userLatitude = useLocationStore((s) => s.userLatitude);
+  const devices = useDeviceStore((s) => s.devices);
+  const selectedDevice = useDeviceStore((s) => s.selectedDevice);
+  const currentLocation = useDeviceStore((s) => s.currentLocation);
+  const historicalRoute = useDeviceStore((s) => s.historicalRoute);
 
   const cameraRef = useRef<Mapbox.Camera>(null);
   const [deviceMarkers, setDeviceMarkers] = useState<MarkerData[]>([]);
@@ -197,4 +192,5 @@ const styles = StyleSheet.create({
   },
 });
 
+const Map = React.memo(MapComponent);
 export default Map;
