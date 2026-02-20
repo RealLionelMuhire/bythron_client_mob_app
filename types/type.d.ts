@@ -116,12 +116,14 @@ declare interface DeviceStore {
   currentLocation: Location | null;
   historicalRoute: HistoricalRoute | null;
   isLoadingLocation: boolean;
+  historyFullScreen: boolean;
   setSelectedDevice: (deviceId: number) => void;
   setDevices: (devices: Device[]) => void;
   clearSelectedDevice: () => void;
   setCurrentLocation: (location: Location) => void;
   setHistoricalRoute: (route: HistoricalRoute | null) => void;
   setLoadingLocation: (loading: boolean) => void;
+  setHistoryFullScreen: (v: boolean) => void;
 }
 
 declare interface DeviceCardProps {

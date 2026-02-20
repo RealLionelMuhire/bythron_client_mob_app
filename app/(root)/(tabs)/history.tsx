@@ -143,6 +143,7 @@ const History = () => {
   const selectedDevice = useDeviceStore((s) => s.selectedDevice);
   const setSelectedDevice = useDeviceStore((s) => s.setSelectedDevice);
   const setDevices = useDeviceStore((s) => s.setDevices);
+  const setHistoryFullScreen = useDeviceStore((s) => s.setHistoryFullScreen);
 
   const [date, setDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -574,7 +575,14 @@ const History = () => {
     setIsPlaying(false);
     setError(null);
     setControlsExpanded(true);
+    setHistoryFullScreen(false);
   };
+
+  useEffect(() => {
+    const fullScreen = routeLoaded && !controlsExpanded;
+    setHistoryFullScreen(fullScreen);
+    return () => setHistoryFullScreen(false);
+  }, [routeLoaded, controlsExpanded, setHistoryFullScreen]);
 
   if (Platform.OS === "web") {
     return (
@@ -886,7 +894,7 @@ const History = () => {
           >
             <Ionicons
               name={playbackPosition >= Math.max(playbackPoints.length - 1, 0) && !isPlaying ? "play-skip-back" : isPlaying ? "pause" : "play"}
-              size={controlsExpanded ? 28 : 24}
+              size={controlsExpanded ? 24 : 20}
               color="white"
             />
           </TouchableOpacity>
@@ -896,35 +904,43 @@ const History = () => {
               <View style={styles.sliderHeader}>
                 <Text style={styles.sliderLabel}>Progress</Text>
                 {routeSummary && routeSummary.endLabel ? (
-                  <Text style={styles.sliderTime}>
+                  <Text style={styles.sliderTime} numberOfLines={1}>
                     {currentPlaybackTimeLabel} → {routeSummary.endLabel}
                   </Text>
                 ) : null}
               </View>
               <View
-                style={styles.sliderTrack}
+                style={styles.sliderTouchArea}
                 onLayout={(e) => setProgressWidth(e.nativeEvent.layout.width)}
                 onStartShouldSetResponder={() => true}
+                onMoveShouldSetResponder={() => true}
+                onResponderTerminationRequest={() => false}
                 onResponderGrant={(e) => { setIsScrubbing(true); handleProgressTouch(e.nativeEvent.locationX); }}
                 onResponderMove={(e) => handleProgressTouch(e.nativeEvent.locationX)}
                 onResponderRelease={() => setIsScrubbing(false)}
               >
-                <View style={[styles.sliderFill, { width: `${playbackProgress * 100}%` }]} />
-                <View style={[styles.sliderThumb, { left: `${playbackProgress * 100}%` }]} />
+                <View style={styles.sliderTrack}>
+                  <View style={[styles.sliderFill, { width: `${playbackProgress * 100}%` }]} />
+                  <View style={[styles.sliderThumb, { left: `${playbackProgress * 100}%` }]} />
+                </View>
               </View>
             </View>
             <View style={styles.sliderBlock}>
-              <Text style={styles.sliderLabel}>Playback speed</Text>
+              <Text style={styles.sliderLabel}>Speed</Text>
               <View
-                style={styles.sliderTrack}
+                style={styles.sliderTouchArea}
                 onLayout={(e) => setSpeedWidth(e.nativeEvent.layout.width)}
                 onStartShouldSetResponder={() => true}
+                onMoveShouldSetResponder={() => true}
+                onResponderTerminationRequest={() => false}
                 onResponderGrant={(e) => { setIsScrubbingSpeed(true); handleSpeedTouch(e.nativeEvent.locationX); }}
                 onResponderMove={(e) => handleSpeedTouch(e.nativeEvent.locationX)}
                 onResponderRelease={() => setIsScrubbingSpeed(false)}
               >
-                <View style={[styles.sliderFill, { width: `${speedProgress * 100}%` }]} />
-                <View style={[styles.sliderThumb, { left: `${speedProgress * 100}%` }]} />
+                <View style={styles.sliderTrack}>
+                  <View style={[styles.sliderFill, { width: `${speedProgress * 100}%` }]} />
+                  <View style={[styles.sliderThumb, { left: `${speedProgress * 100}%` }]} />
+                </View>
               </View>
               <Text style={[styles.sliderValue, isScrubbingSpeed && styles.sliderValueActive]}>{playbackSpeed.toFixed(1)}×</Text>
             </View>
@@ -933,6 +949,11 @@ const History = () => {
         )}
 
         <View style={[styles.mapControls, routeLoaded && !controlsExpanded && styles.mapControlsTracking]}>
+          {routeLoaded && !controlsExpanded && (
+            <TouchableOpacity onPress={handleChangeRoute} style={styles.mapControlBtn} accessibilityLabel="Back">
+              <Ionicons name="arrow-back" size={24} color="#5BB8E8" />
+            </TouchableOpacity>
+          )}
           <TouchableOpacity onPress={handleToggleStyle} style={styles.mapControlBtn}>
             <MaterialCommunityIcons name="layers" size={22} color="#5BB8E8" />
           </TouchableOpacity>
@@ -1185,48 +1206,54 @@ const styles = StyleSheet.create({
   speedCardValueCompact: { color: "#fff", fontWeight: "700", fontSize: 14 },
   playbackBar: {
     position: "absolute",
-    left: 16,
-    right: 16,
-    bottom: 16,
+    left: 12,
+    right: 12,
+    bottom: 12,
     flexDirection: "row",
     alignItems: "center",
-    gap: 14,
-    padding: 14,
-    borderRadius: 16,
+    gap: 10,
+    padding: 10,
+    paddingVertical: 8,
+    borderRadius: 12,
     backgroundColor: "rgba(17, 30, 44, 0.96)",
     borderWidth: 1,
     borderColor: "#5BB8E8",
   },
   playButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 14,
+    width: 44,
+    height: 44,
+    borderRadius: 10,
     backgroundColor: "#0A63A8",
     alignItems: "center",
     justifyContent: "center",
   },
   playButtonDisabled: { opacity: 0.5 },
-  playbackBarCompact: { padding: 10, paddingVertical: 10, gap: 10 },
-  playButtonCompact: { width: 48, height: 48, borderRadius: 12 },
-  playbackSliders: { flex: 1, gap: 14 },
-  sliderBlock: { gap: 4 },
-  sliderHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  sliderLabel: { fontSize: 11, color: "#94A3B8", fontFamily: "Jakarta-Medium" },
-  sliderTime: { fontSize: 10, color: "#A8D8F0", fontFamily: "Jakarta-Medium" },
-  sliderValue: { fontSize: 11, color: "#94A3B8", marginTop: 2, fontFamily: "Jakarta-Medium" },
+  playbackBarCompact: { padding: 8, paddingVertical: 6, gap: 8, left: 10, right: 10, bottom: 10 },
+  playButtonCompact: { width: 38, height: 38, borderRadius: 8 },
+  playbackSliders: { flex: 1, gap: 8, minWidth: 0 },
+  sliderBlock: { gap: 2 },
+  sliderHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", minHeight: 16 },
+  sliderLabel: { fontSize: 10, color: "#94A3B8", fontFamily: "Jakarta-Medium" },
+  sliderTime: { fontSize: 9, color: "#A8D8F0", fontFamily: "Jakarta-Medium", flex: 1, marginLeft: 4 },
+  sliderValue: { fontSize: 10, color: "#94A3B8", marginTop: 0, fontFamily: "Jakarta-Medium" },
   sliderValueActive: { color: "#5BB8E8" },
-  sliderTrack: { height: 8, borderRadius: 4, backgroundColor: "#243345", position: "relative", justifyContent: "center" },
-  sliderFill: { position: "absolute", left: 0, top: 0, bottom: 0, backgroundColor: "#5BB8E8", borderRadius: 4 },
+  sliderTouchArea: {
+    paddingVertical: 12,
+    marginVertical: -12,
+    justifyContent: "center",
+  },
+  sliderTrack: { height: 6, borderRadius: 3, backgroundColor: "#243345", position: "relative", justifyContent: "center" },
+  sliderFill: { position: "absolute", left: 0, top: 0, bottom: 0, backgroundColor: "#5BB8E8", borderRadius: 3 },
   sliderThumb: {
     position: "absolute",
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
     backgroundColor: "#5BB8E8",
     borderWidth: 2,
     borderColor: "#fff",
-    marginLeft: -9,
-    top: -5,
+    marginLeft: -7,
+    top: -4,
   },
   mapControls: { position: "absolute", left: 16, top: 16, gap: 10 },
   mapControlBtn: {
