@@ -116,7 +116,7 @@ const Home = () => {
     // Navigate to different screens/tabs
     switch (screen) {
       case "tracking":
-        router.push("/(root)/(tabs)/alerts");
+        router.push("/(root)/(tabs)/tracking");
         break;
       case "vehicles":
         router.push("/(root)/(tabs)/vehicles");

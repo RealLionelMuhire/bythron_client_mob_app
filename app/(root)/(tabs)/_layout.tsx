@@ -94,14 +94,17 @@ export default function Layout() {
       />
 
       <Tabs.Screen
-        name="home_old"
+        name="tracking"
         options={{
-          href: null,
+          title: "Tracking",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="navigate" size={size} color={color} />
+          ),
         }}
       />
 
       <Tabs.Screen
-        name="tracking"
+        name="home_old"
         options={{
           href: null,
         }}

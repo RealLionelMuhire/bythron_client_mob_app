@@ -465,14 +465,27 @@ const History = () => {
 
   useEffect(() => {
     if (!animatedPoint || !cameraRef.current) return;
+    const duration = isPlaying ? 50 : 800;
+    const mode = isPlaying ? "easeTo" : "flyTo";
     cameraRef.current.setCamera({
       centerCoordinate: animatedPoint.geometry.coordinates,
       zoomLevel: 13,
       pitch,
-      animationMode: "flyTo",
-      animationDuration: 800,
+      animationMode: mode,
+      animationDuration: duration,
     });
-  }, [animatedPoint, pitch]);
+  }, [animatedPoint, pitch, isPlaying]);
+
+  const handleRecenter = () => {
+    if (!animatedPoint || !cameraRef.current) return;
+    cameraRef.current.setCamera({
+      centerCoordinate: animatedPoint.geometry.coordinates,
+      zoomLevel: 13,
+      pitch,
+      animationMode: "easeTo",
+      animationDuration: 50,
+    });
+  };
 
   useEffect(() => {
     if (!isPlaying || !playbackPoints.length) return;
@@ -960,12 +973,12 @@ const History = () => {
           <TouchableOpacity onPress={handleToggle3D} style={styles.mapControlBtn}>
             <MaterialCommunityIcons name="cube-outline" size={22} color="#5BB8E8" />
           </TouchableOpacity>
+          {routeLoaded && (
+            <TouchableOpacity onPress={handleRecenter} style={styles.mapControlBtn} accessibilityLabel="Recenter on moving object">
+              <Ionicons name="navigate-circle" size={22} color="#5BB8E8" />
+            </TouchableOpacity>
+          )}
         </View>
-        {routeLoaded && !controlsExpanded && (
-          <TouchableOpacity style={styles.trackingRightMenuButton} onPress={handleChangeRoute}>
-            <Ionicons name="ellipsis-vertical" size={24} color="white" />
-          </TouchableOpacity>
-        )}
       </View>
 
       <View style={[styles.infoStrip, routeLoaded && !controlsExpanded && styles.infoStripCompact]}>
@@ -1267,19 +1280,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   mapControlsTracking: { left: 15, top: 20, gap: 12 },
-  trackingRightMenuButton: {
-    position: "absolute",
-    right: 15,
-    bottom: 100,
-    width: 45,
-    height: 45,
-    borderRadius: 22.5,
-    backgroundColor: "#5BB8E8",
-    borderWidth: 2,
-    borderColor: "#5BB8E8",
-    alignItems: "center",
-    justifyContent: "center",
-  },
   infoStrip: {
     paddingHorizontal: 20,
     paddingVertical: 14,
