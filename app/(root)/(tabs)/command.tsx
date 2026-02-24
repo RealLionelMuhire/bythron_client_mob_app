@@ -11,19 +11,17 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 
+import { DIALOG_COLORS, getThemeColors } from "@/constants/theme";
 import { fetchAPI } from "@/lib/fetch";
 import { useDeviceStore } from "@/store";
+import { useColorScheme } from "nativewind";
 
 type DialogType = "success" | "error" | "warning" | "info";
 
-const DIALOG_COLORS: Record<DialogType, { bg: string; icon: string; btn: string }> = {
-  success: { bg: "#ECFDF5", icon: "#10B981", btn: "#10B981" },
-  error:   { bg: "#FEF2F2", icon: "#EF4444", btn: "#EF4444" },
-  warning: { bg: "#FFFBEB", icon: "#F59E0B", btn: "#F59E0B" },
-  info:    { bg: "#EFF6FF", icon: "#5BB8E8", btn: "#5BB8E8" },
-};
-
 const Command = () => {
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === "dark";
+  const colors = getThemeColors(isDark ? "dark" : "light");
   const devices = useDeviceStore((s) => s.devices);
   const selectedDevice = useDeviceStore((s) => s.selectedDevice);
   const setSelectedDevice = useDeviceStore((s) => s.setSelectedDevice);
@@ -42,7 +40,7 @@ const Command = () => {
   const [confirmModal, setConfirmModal] = useState<{
     visible: boolean; title: string; message: string; icon: keyof typeof Ionicons.glyphMap;
     iconColor: string; label: string; color: string; onConfirm: () => void;
-  }>({ visible: false, title: "", message: "", icon: "alert-circle", iconColor: "#E36060", label: "", color: "#E36060", onConfirm: () => {} });
+  }>({ visible: false, title: "", message: "", icon: "alert-circle", iconColor: colors.status.error, label: "", color: colors.status.error, onConfirm: () => {} });
 
   const showDialog = useCallback((type: DialogType, title: string, message: string, icon?: keyof typeof Ionicons.glyphMap) => {
     const defaults: Record<DialogType, keyof typeof Ionicons.glyphMap> = {
@@ -84,9 +82,9 @@ const Command = () => {
       title: "Stop the vehicle?",
       message: "This will cut the fuel supply and the vehicle will stop moving. This is used for immobilization.\n\nAre you sure you want to proceed?",
       icon: "warning",
-      iconColor: "#E36060",
+      iconColor: colors.status.error,
       label: "Yes, cut fuel",
-      color: "#E36060",
+      color: colors.status.error,
       onConfirm: async () => {
         setConfirmModal((p) => ({ ...p, visible: false }));
         setCommandLoading("Cut fuel");
@@ -110,9 +108,9 @@ const Command = () => {
       title: "Restore fuel supply?",
       message: "This will restore the fuel supply and the vehicle will be able to move again.\n\nAre you sure?",
       icon: "information-circle",
-      iconColor: "#4CAF50",
+      iconColor: colors.status.success,
       label: "Yes, restore fuel",
-      color: "#4CAF50",
+      color: colors.status.success,
       onConfirm: async () => {
         setConfirmModal((p) => ({ ...p, visible: false }));
         setCommandLoading("Restore fuel");
@@ -131,26 +129,25 @@ const Command = () => {
   }, [deviceId, showDialog]);
 
   const fuelLabel = fuelStatus === "cut" ? "Fuel is currently CUT — vehicle cannot move" : fuelStatus === "active" ? "Fuel supply is active — vehicle can move" : null;
-  const fuelColor = fuelStatus === "cut" ? "#EF4444" : "#10B981";
+  const fuelColor = fuelStatus === "cut" ? colors.status.error : colors.status.success;
 
   return (
-    <SafeAreaView className="flex-1" style={{ backgroundColor: "#F7FAFF" }}>
+    <SafeAreaView className={`flex-1 ${isDark ? "bg-slate-900" : "bg-surface-light"}`}>
       <ScrollView className="px-5" contentContainerStyle={{ paddingBottom: 120, paddingTop: 10 }}>
-        <Text className="text-2xl font-JakartaBold my-5">Commands</Text>
+        <Text className={`text-2xl font-JakartaBold my-5 ${isDark ? "text-slate-100" : "text-slate-900"}`}>Commands</Text>
 
         {/* Device selector */}
         {devices.length > 1 && (
-          <View className="bg-white rounded-2xl shadow-sm shadow-neutral-300 px-5 py-4 mb-4">
-            <Text className="text-sm font-JakartaMedium text-gray-500 mb-2">Select device</Text>
+          <View className={`rounded-2xl shadow-sm border px-5 py-4 mb-4 ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200"}`}>
+            <Text className={`text-sm font-JakartaMedium mb-2 ${isDark ? "text-slate-400" : "text-slate-600"}`}>Select device</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               {devices.map((d) => (
                 <TouchableOpacity
                   key={d.id}
                   onPress={() => setSelectedDevice(d.id)}
-                  className="mr-3 px-4 py-2 rounded-xl"
-                  style={{ backgroundColor: deviceId === d.id ? "#5BB8E8" : "#E2E8F0" }}
+                  className={`mr-3 px-4 py-2 rounded-xl ${deviceId === d.id ? "bg-accent-400" : isDark ? "bg-slate-600" : "bg-slate-200"}`}
                 >
-                  <Text className="text-sm font-JakartaBold" style={{ color: deviceId === d.id ? "#fff" : "#475569" }}>{d.name}</Text>
+                  <Text className={`text-sm font-JakartaBold ${deviceId === d.id ? "text-white" : isDark ? "text-slate-300" : "text-slate-600"}`}>{d.name}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -158,25 +155,25 @@ const Command = () => {
         )}
 
         {deviceId == null ? (
-          <View className="bg-white rounded-2xl shadow-sm shadow-neutral-300 px-5 py-8 items-center mb-4">
-            <Ionicons name="terminal-outline" size={48} color="#94A3B8" />
-            <Text className="text-base font-JakartaMedium text-slate-500 mt-3">No device available</Text>
-            <Text className="text-xs font-JakartaMedium text-slate-400 mt-1">Add a tracker to send commands.</Text>
+          <View className={`rounded-2xl shadow-sm border px-5 py-8 items-center mb-4 ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200"}`}>
+            <Ionicons name="terminal-outline" size={48} color={colors.status.muted} />
+            <Text className={`text-base font-JakartaMedium mt-3 ${isDark ? "text-slate-400" : "text-slate-600"}`}>No device available</Text>
+            <Text className={`text-xs font-JakartaMedium mt-1 ${isDark ? "text-slate-400" : "text-slate-500"}`}>Add a tracker to send commands.</Text>
           </View>
         ) : (
           <>
             {/* Fuel control */}
-            <View className="bg-white rounded-2xl shadow-sm shadow-neutral-300 px-5 py-4 mb-4">
+            <View className={`rounded-2xl shadow-sm border px-5 py-4 mb-4 ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200"}`}>
               <View className="flex-row items-center mb-2">
-                <MaterialCommunityIcons name="fuel" size={22} color="#5BB8E8" />
-                <Text className="text-lg font-JakartaBold text-slate-800 ml-2">Fuel control</Text>
+                <MaterialCommunityIcons name="fuel" size={22} color={colors.accent[400]} />
+                <Text className={`text-lg font-JakartaBold ml-2 ${isDark ? "text-slate-100" : "text-slate-900"}`}>Fuel control</Text>
               </View>
-              <Text className="text-xs font-JakartaMedium text-gray-400 mb-3">
+              <Text className="text-xs font-JakartaMedium text-slate-500 dark:text-slate-400 mb-3">
                 Control the vehicle's fuel supply remotely. Cutting fuel will stop the vehicle from moving.
               </Text>
 
               {fuelLabel && (
-                <View className="flex-row items-center rounded-xl px-3 py-2 mb-3" style={{ backgroundColor: fuelStatus === "cut" ? "#FEF2F2" : "#ECFDF5" }}>
+                <View className={`flex-row items-center rounded-xl px-3 py-2 mb-3 ${fuelStatus === "cut" ? "bg-danger-100" : "bg-success-100"}`}>
                   <Ionicons name={fuelStatus === "cut" ? "alert-circle" : "checkmark-circle"} size={16} color={fuelColor} />
                   <Text className="text-xs font-JakartaBold ml-2" style={{ color: fuelColor }}>{fuelLabel}</Text>
                 </View>
@@ -186,8 +183,7 @@ const Command = () => {
                 <TouchableOpacity
                   onPress={handleFuelCut}
                   disabled={commandLoading !== null}
-                  className="flex-1 flex-row items-center justify-center py-3 rounded-xl"
-                  style={{ backgroundColor: "#E36060" }}
+                  className="flex-1 flex-row items-center justify-center py-3 rounded-xl bg-status-error"
                 >
                   {commandLoading === "Cut fuel" ? <ActivityIndicator size="small" color="#fff" /> : (
                     <>
@@ -199,8 +195,7 @@ const Command = () => {
                 <TouchableOpacity
                   onPress={handleFuelRestore}
                   disabled={commandLoading !== null}
-                  className="flex-1 flex-row items-center justify-center py-3 rounded-xl"
-                  style={{ backgroundColor: "#4CAF50" }}
+                  className="flex-1 flex-row items-center justify-center py-3 rounded-xl bg-status-success"
                 >
                   {commandLoading === "Restore fuel" ? <ActivityIndicator size="small" color="#fff" /> : (
                     <>
@@ -213,17 +208,16 @@ const Command = () => {
             </View>
 
             {/* Query */}
-            <View className="bg-white rounded-2xl shadow-sm shadow-neutral-300 px-5 py-4 mb-4">
+            <View className={`rounded-2xl shadow-sm border px-5 py-4 mb-4 ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200"}`}>
               <View className="flex-row items-center mb-3">
-                <Ionicons name="search" size={22} color="#5BB8E8" />
-                <Text className="text-lg font-JakartaBold text-slate-800 ml-2">Query device</Text>
+                <Ionicons name="search" size={22} color={colors.accent[400]} />
+                <Text className={`text-lg font-JakartaBold ml-2 ${isDark ? "text-slate-100" : "text-slate-900"}`}>Query device</Text>
               </View>
 
               <TouchableOpacity
                 onPress={() => sendCommand("Query status", "/query/status")}
                 disabled={commandLoading !== null}
-                className="flex-row items-center py-3 px-4 rounded-xl mb-2"
-                style={{ backgroundColor: "#5BB8E8" }}
+                className="flex-row items-center py-3 px-4 rounded-xl mb-2 bg-accent-400"
               >
                 {commandLoading === "Query status" ? <ActivityIndicator size="small" color="#fff" /> : (
                   <>
@@ -236,8 +230,7 @@ const Command = () => {
               <TouchableOpacity
                 onPress={() => sendCommand("Query location", "/query/location")}
                 disabled={commandLoading !== null}
-                className="flex-row items-center py-3 px-4 rounded-xl"
-                style={{ backgroundColor: "#5BB8E8" }}
+                className="flex-row items-center py-3 px-4 rounded-xl bg-accent-400"
               >
                 {commandLoading === "Query location" ? <ActivityIndicator size="small" color="#fff" /> : (
                   <>
@@ -249,22 +242,22 @@ const Command = () => {
             </View>
 
             {/* Advanced - collapsible */}
-            <View className="bg-white rounded-2xl shadow-sm shadow-neutral-300 px-5 py-4 mb-4">
+            <View className={`rounded-2xl shadow-sm border px-5 py-4 mb-4 ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200"}`}>
               <TouchableOpacity
                 onPress={() => setShowAdvanced((v) => !v)}
                 className="flex-row items-center justify-between"
               >
                 <View className="flex-row items-center">
-                  <Ionicons name="terminal" size={22} color="#0A63A8" />
-                  <Text className="text-lg font-JakartaBold text-slate-800 ml-2">Advanced</Text>
+                  <Ionicons name="terminal" size={22} color={colors.accent[500]} />
+                  <Text className={`text-lg font-JakartaBold ml-2 ${isDark ? "text-slate-100" : "text-slate-900"}`}>Advanced</Text>
                 </View>
-                <Ionicons name={showAdvanced ? "chevron-up" : "chevron-down"} size={22} color="#94A3B8" />
+                <Ionicons name={showAdvanced ? "chevron-up" : "chevron-down"} size={22} color={colors.status.muted} />
               </TouchableOpacity>
 
               {showAdvanced && (
                 <View className="mt-4">
-                  <Text className="text-sm font-JakartaBold text-slate-600 mb-2">Send raw command</Text>
-                  <Text className="text-xs font-JakartaMedium text-gray-400 mb-3">
+                  <Text className={`text-sm font-JakartaBold mb-2 ${isDark ? "text-slate-400" : "text-slate-600"}`}>Send raw command</Text>
+                  <Text className={`text-xs font-JakartaMedium mb-3 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
                     Send a custom command directly to the tracker device.
                   </Text>
                   <View className="flex-row items-center gap-2">
@@ -272,14 +265,13 @@ const Command = () => {
                       value={rawCommand}
                       onChangeText={setRawCommand}
                       placeholder="e.g. STATUS#"
-                      placeholderTextColor="#94A3B8"
-                      className="flex-1 border border-slate-300 rounded-xl px-4 py-2 text-sm font-JakartaMedium"
+                      placeholderTextColor={colors.status.muted}
+                      className={`flex-1 border rounded-xl px-4 py-2 text-sm font-JakartaMedium ${isDark ? "border-slate-600 text-slate-100 bg-slate-800" : "border-slate-300 text-slate-900 bg-white"}`}
                     />
                     <TouchableOpacity
                       onPress={sendRawCommand}
                       disabled={commandLoading !== null}
-                      className="py-2 px-4 rounded-xl"
-                      style={{ backgroundColor: "#5BB8E8" }}
+                      className="py-2 px-4 rounded-xl bg-accent-400"
                     >
                       {commandLoading === "Raw command" ? <ActivityIndicator size="small" color="#fff" /> : (
                         <Text className="text-white font-JakartaBold">Send</Text>
@@ -296,15 +288,15 @@ const Command = () => {
       {/* Dialog */}
       <Modal visible={dialog.visible} transparent animationType="fade">
         <View className="flex-1 justify-center items-center px-6" style={{ backgroundColor: "rgba(0,0,0,0.45)" }}>
-          <View className="bg-white rounded-2xl w-full max-w-sm overflow-hidden">
+          <View className={`rounded-2xl w-full max-w-sm overflow-hidden ${isDark ? "bg-slate-800" : "bg-white"}`}>
             <View className="items-center pt-6 pb-4 px-5" style={{ backgroundColor: DIALOG_COLORS[dialog.type].bg }}>
-              <View className="w-16 h-16 rounded-full items-center justify-center mb-3" style={{ backgroundColor: "#fff" }}>
+              <View className={`w-16 h-16 rounded-full items-center justify-center mb-3 ${isDark ? "bg-slate-700" : "bg-white"}`}>
                 <Ionicons name={dialog.icon} size={40} color={DIALOG_COLORS[dialog.type].icon} />
               </View>
-              <Text className="text-lg font-JakartaBold text-slate-800 text-center">{dialog.title}</Text>
+              <Text className={`text-lg font-JakartaBold text-center ${isDark ? "text-slate-100" : "text-slate-800"}`}>{dialog.title}</Text>
             </View>
             <View className="px-5 pt-4 pb-5">
-              <Text className="text-sm font-JakartaMedium text-slate-600 text-center leading-5">{dialog.message}</Text>
+              <Text className={`text-sm font-JakartaMedium text-center leading-5 ${isDark ? "text-slate-300" : "text-slate-600"}`}>{dialog.message}</Text>
               <TouchableOpacity
                 onPress={() => setDialog((p) => ({ ...p, visible: false }))}
                 className="mt-5 py-3 rounded-xl items-center"
@@ -320,21 +312,21 @@ const Command = () => {
       {/* Confirm modal */}
       <Modal visible={confirmModal.visible} transparent animationType="fade">
         <View className="flex-1 justify-center items-center px-6" style={{ backgroundColor: "rgba(0,0,0,0.45)" }}>
-          <View className="bg-white rounded-2xl w-full max-w-sm overflow-hidden">
-            <View className="items-center pt-6 pb-4 px-5" style={{ backgroundColor: "#FFFBEB" }}>
-              <View className="w-16 h-16 rounded-full items-center justify-center mb-3" style={{ backgroundColor: "#fff" }}>
+          <View className={`rounded-2xl w-full max-w-sm overflow-hidden ${isDark ? "bg-slate-800" : "bg-white"}`}>
+            <View className={`items-center pt-6 pb-4 px-5 ${isDark ? "bg-slate-700" : "bg-amber-50"}`}>
+              <View className={`w-16 h-16 rounded-full items-center justify-center mb-3 ${isDark ? "bg-slate-600" : "bg-white"}`}>
                 <Ionicons name={confirmModal.icon} size={40} color={confirmModal.iconColor} />
               </View>
-              <Text className="text-lg font-JakartaBold text-slate-800 text-center">{confirmModal.title}</Text>
+              <Text className={`text-lg font-JakartaBold text-center ${isDark ? "text-slate-100" : "text-slate-800"}`}>{confirmModal.title}</Text>
             </View>
             <View className="px-5 pt-4 pb-5">
-              <Text className="text-sm font-JakartaMedium text-slate-600 text-center leading-5">{confirmModal.message}</Text>
+              <Text className={`text-sm font-JakartaMedium text-center leading-5 ${isDark ? "text-slate-300" : "text-slate-600"}`}>{confirmModal.message}</Text>
               <View className="flex-row gap-3 mt-5">
                 <TouchableOpacity
                   onPress={() => setConfirmModal((p) => ({ ...p, visible: false }))}
-                  className="flex-1 py-3 rounded-xl items-center border border-slate-300"
+                  className={`flex-1 py-3 rounded-xl items-center border ${isDark ? "border-slate-600" : "border-slate-300"}`}
                 >
-                  <Text className="font-JakartaBold text-slate-600">Cancel</Text>
+                  <Text className={`font-JakartaBold ${isDark ? "text-slate-300" : "text-slate-600"}`}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={confirmModal.onConfirm}

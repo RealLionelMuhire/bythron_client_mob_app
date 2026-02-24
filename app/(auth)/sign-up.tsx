@@ -89,11 +89,11 @@ const SignUp = () => {
     }
   };
   return (
-    <ScrollView className="flex-1 bg-white">
-      <View className="flex-1 bg-white">
+    <ScrollView className="flex-1 bg-white dark:bg-slate-900">
+      <View className="flex-1 bg-white dark:bg-slate-900">
         <View className="relative w-full h-[250px]">
           <Image source={images.signUpCar} className="z-0 w-full h-[250px]" resizeMode="cover" />
-          <Text className="text-2xl text-black font-JakartaSemiBold absolute bottom-5 left-5">
+          <Text className="text-2xl text-black dark:text-white font-JakartaSemiBold absolute bottom-5 left-5">
             Create Your Account
           </Text>
         </View>
@@ -130,10 +130,10 @@ const SignUp = () => {
           <OAuth />
           <Link
             href="/sign-in"
-            className="text-lg text-center text-general-200 mt-10"
+            className="text-lg text-center text-slate-600 dark:text-slate-400 mt-10"
           >
             Already have an account?{" "}
-            <Text className="text-primary-500">Log In</Text>
+            <Text className="text-accent-500">Log In</Text>
           </Link>
         </View>
         <ReactNativeModal
@@ -147,11 +147,11 @@ const SignUp = () => {
             }
           }}
         >
-          <View className="bg-white px-7 py-9 rounded-2xl min-h-[300px]">
-            <Text className="font-JakartaExtraBold text-2xl mb-2">
+          <View className="bg-white dark:bg-slate-800 px-7 py-9 rounded-2xl min-h-[300px]">
+            <Text className="font-JakartaExtraBold text-2xl mb-2 text-slate-900 dark:text-slate-100">
               Verification
             </Text>
-            <Text className="font-Jakarta mb-5">
+            <Text className="font-Jakarta mb-5 text-slate-600 dark:text-slate-400">
               We've sent a verification code to {form.email}.
             </Text>
             <InputField
@@ -165,7 +165,7 @@ const SignUp = () => {
               }
             />
             {verification.error && (
-              <Text className="text-red-500 text-sm mt-1">
+              <Text className="text-status-error text-sm mt-1">
                 {verification.error}
               </Text>
             )}
@@ -177,15 +177,15 @@ const SignUp = () => {
           </View>
         </ReactNativeModal>
         <ReactNativeModal isVisible={showSuccessModal}>
-          <View className="bg-white px-7 py-9 rounded-2xl min-h-[300px]">
+          <View className="bg-white dark:bg-slate-800 px-7 py-9 rounded-2xl min-h-[300px]">
             <Image
               source={images.check}
               className="w-[110px] h-[110px] mx-auto my-5"
             />
-            <Text className="text-3xl font-JakartaBold text-center">
+            <Text className="text-3xl font-JakartaBold text-center text-slate-900 dark:text-slate-100">
               Verified
             </Text>
-            <Text className="text-base text-gray-400 font-Jakarta text-center mt-2">
+            <Text className="text-base text-slate-600 dark:text-slate-400 font-Jakarta text-center mt-2">
               You have successfully verified your account.
             </Text>
             <CustomButton

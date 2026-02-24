@@ -15,7 +15,9 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { format, differenceInSeconds } from "date-fns";
 import Mapbox from "@rnmapbox/maps";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { useColorScheme } from "nativewind";
 
+import { getThemeColors, theme } from "@/constants/theme";
 import { fetchAPI } from "@/lib/fetch";
 import { useDeviceStore, useLocationStore } from "@/store";
 import { Device } from "@/types/type";
@@ -136,6 +138,9 @@ const SPEEDOMETER_MAX = 120;
 const SPEED_DISPLAY_MULTIPLIER = 1;
 
 const History = () => {
+  const { colorScheme } = useColorScheme();
+  const colors = getThemeColors(colorScheme === "dark" ? "dark" : "light");
+  const styles = useMemo(() => createHistoryStyles(colors), [colors]);
   const cameraRef = useRef<Mapbox.Camera>(null);
   const userLatitude = useLocationStore((s) => s.userLatitude);
   const userLongitude = useLocationStore((s) => s.userLongitude);
@@ -599,9 +604,9 @@ const History = () => {
 
   if (Platform.OS === "web") {
     return (
-      <View className="flex-1 items-center justify-center p-5" style={{ backgroundColor: "#1A2A3A" }}>
-        <Text className="text-white text-lg font-JakartaBold">History</Text>
-        <Text className="text-gray-400 mt-2 font-JakartaMedium text-center">
+      <View className="flex-1 items-center justify-center p-5 bg-surface-light">
+        <Text className="text-slate-900 text-lg font-JakartaBold">History</Text>
+        <Text className="text-status-muted mt-2 font-JakartaMedium text-center">
           Map view is only available on mobile devices.
         </Text>
       </View>
@@ -634,12 +639,12 @@ const History = () => {
           <View style={styles.trackingInfoContainer}>
             <View style={styles.trackingLeftIcons}>
               <View style={styles.trackingIconButton}>
-                <Ionicons name="time-outline" size={20} color="#5BB8E8" />
+                <Ionicons name="time-outline" size={20} color={colors.accent[400]} />
                 <Text style={styles.trackingIconLabel}>Speed</Text>
                 <Text style={styles.trackingIconStatus}>{playbackSpeed.toFixed(1)}×</Text>
               </View>
               <View style={styles.trackingIconButton}>
-                <MaterialCommunityIcons name="map-marker-path" size={20} color="#5BB8E8" />
+                <MaterialCommunityIcons name="map-marker-path" size={20} color={colors.accent[400]} />
                 <Text style={styles.trackingIconLabel}>Playback</Text>
                 <Text style={styles.trackingIconStatus}>{isPlaying ? "On" : "Off"}</Text>
               </View>
@@ -648,7 +653,7 @@ const History = () => {
               <Speedometer speed={displaySpeed} maxSpeed={SPEEDOMETER_MAX} size="large" />
               <Text style={styles.trackingCurrentSpeed}>{displaySpeed.toFixed(0)} KM/H</Text>
               <View style={styles.trackingDistanceRow}>
-                <MaterialCommunityIcons name="road-variant" size={18} color="#5BB8E8" style={styles.trackingDistanceIcon} />
+                <MaterialCommunityIcons name="road-variant" size={18} color={colors.accent[400]} style={styles.trackingDistanceIcon} />
                 <Text style={styles.trackingTotalDistance}>
                   {routeSummary ? `${routeSummary.distanceKm.toFixed(1)} km` : "— km"}
                 </Text>
@@ -658,14 +663,14 @@ const History = () => {
               <View style={styles.trackingStatusCard}>
                 <View style={styles.trackingStatusHeader}>
                   <Text style={styles.trackingStatusText}>{isPlaying ? "Playing" : "Paused"}</Text>
-                  <Ionicons name={isPlaying ? "play" : "pause"} size={18} color="#5BB8E8" />
+                  <Ionicons name={isPlaying ? "play" : "pause"} size={18} color={colors.accent[400]} />
                 </View>
                 <Text style={styles.trackingStatusLabel}>M</Text>
               </View>
               <View style={styles.trackingInfoCard}>
                 <View style={styles.trackingInfoRow}>
                   <Text style={styles.trackingInfoDate}>{format(date, "dd-MM-yy")}</Text>
-                  <Ionicons name="calendar-outline" size={16} color="#5BB8E8" />
+                  <Ionicons name="calendar-outline" size={16} color={colors.accent[400]} />
                 </View>
                 <Text style={styles.trackingInfoLabel}>Time</Text>
                 <Text style={styles.trackingInfoTime}>
@@ -679,12 +684,12 @@ const History = () => {
             onPress={handleChangeRoute}
             activeOpacity={0.9}
           >
-            <Ionicons name="location" size={18} color="#5BB8E8" />
-            <MaterialCommunityIcons name="road-variant" size={16} color="#5BB8E8" />
+            <Ionicons name="location" size={18} color={colors.accent[400]} />
+            <MaterialCommunityIcons name="road-variant" size={16} color={colors.accent[400]} />
             <Text style={styles.trackingAddressText} numberOfLines={1}>
               {deviceName} · {dateLabel} · Tap to change route
             </Text>
-            <Ionicons name="chevron-down" size={18} color="#5BB8E8" />
+            <Ionicons name="chevron-down" size={18} color={colors.accent[400]} />
           </TouchableOpacity>
         </View>
       )}
@@ -718,7 +723,7 @@ const History = () => {
                       onPress={() => setSelectedDevice(device.id)}
                       style={[styles.deviceChip, isActive && styles.deviceChipActive]}
                     >
-                      <Ionicons name="car-outline" size={16} color={isActive ? "#fff" : "#A8D8F0"} style={{ marginRight: 6 }} />
+                      <Ionicons name="car-outline" size={16} color={isActive ? colors.surface.card : colors.accent[200]} style={{ marginRight: 6 }} />
                       <Text style={[styles.deviceChipText, isActive && styles.deviceChipTextActive]}>
                         {device.name}
                       </Text>
@@ -735,7 +740,7 @@ const History = () => {
                   onPress={() => setShowDatePicker(true)}
                   style={[styles.dateButton, routeData && styles.dateButtonSuccess]}
                 >
-                  <Ionicons name="calendar-outline" size={18} color="#5BB8E8" style={{ marginRight: 8 }} />
+                  <Ionicons name="calendar-outline" size={18} color={colors.accent[400]} style={{ marginRight: 8 }} />
                   <Text style={styles.dateButtonText}>{dateLabel}</Text>
                   <Text style={styles.dateYear}>{format(date, "yyyy")}</Text>
                 </TouchableOpacity>
@@ -762,7 +767,7 @@ const History = () => {
 
             {error && (
               <View style={styles.errorCard}>
-                <Ionicons name="warning-outline" size={20} color="#F87171" />
+                <Ionicons name="warning-outline" size={20} color={colors.status.error} />
                 <Text style={styles.errorText}>{error}</Text>
                 <TouchableOpacity onPress={() => { setError(null); handleLoadRoute(); }} style={styles.retryButton}>
                   <Text style={styles.retryButtonText}>Retry</Text>
@@ -799,13 +804,13 @@ const History = () => {
       >
         {loading && !routeData ? (
           <View style={styles.loadingOverlay}>
-            <ActivityIndicator size="large" color="#5BB8E8" />
+            <ActivityIndicator size="large" color={colors.accent[400]} />
             <Text style={styles.loadingText}>Loading route data…</Text>
           </View>
         ) : !routeData && !routeLine ? (
           <View style={styles.emptyState}>
             <View style={styles.emptyIconWrap}>
-              <MaterialCommunityIcons name="map-marker-path" size={48} color="#5BB8E8" />
+              <MaterialCommunityIcons name="map-marker-path" size={48} color={colors.accent[400]} />
             </View>
             <Text style={styles.emptyTitle}>No route loaded</Text>
             <Text style={styles.emptySubtitle}>Choose a device and date, then tap "Load route" to see playback</Text>
@@ -964,18 +969,18 @@ const History = () => {
         <View style={[styles.mapControls, routeLoaded && !controlsExpanded && styles.mapControlsTracking]}>
           {routeLoaded && !controlsExpanded && (
             <TouchableOpacity onPress={handleChangeRoute} style={styles.mapControlBtn} accessibilityLabel="Back">
-              <Ionicons name="arrow-back" size={24} color="#5BB8E8" />
+              <Ionicons name="arrow-back" size={24} color={colors.accent[400]} />
             </TouchableOpacity>
           )}
           <TouchableOpacity onPress={handleToggleStyle} style={styles.mapControlBtn}>
-            <MaterialCommunityIcons name="layers" size={22} color="#5BB8E8" />
+            <MaterialCommunityIcons name="layers" size={22} color={colors.accent[400]} />
           </TouchableOpacity>
           <TouchableOpacity onPress={handleToggle3D} style={styles.mapControlBtn}>
-            <MaterialCommunityIcons name="cube-outline" size={22} color="#5BB8E8" />
+            <MaterialCommunityIcons name="cube-outline" size={22} color={colors.accent[400]} />
           </TouchableOpacity>
           {routeLoaded && (
             <TouchableOpacity onPress={handleRecenter} style={styles.mapControlBtn} accessibilityLabel="Recenter on moving object">
-              <Ionicons name="navigate-circle" size={22} color="#5BB8E8" />
+              <Ionicons name="navigate-circle" size={22} color={colors.accent[400]} />
             </TouchableOpacity>
           )}
         </View>
@@ -1017,25 +1022,26 @@ const History = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#1A2A3A" },
+function createHistoryStyles(colors: ReturnType<typeof getThemeColors>) {
+  return StyleSheet.create({
+  screen: { flex: 1, backgroundColor: colors.surface.light },
   compactBar: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 10,
-    backgroundColor: "rgba(17, 30, 44, 0.96)",
+    backgroundColor: colors.surface.card,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(91, 184, 232, 0.25)",
+    borderBottomColor: colors.surface.border,
   },
-  compactBarTitle: { fontSize: 14, color: "#E2E8F0", flex: 1, marginRight: 12, fontFamily: "Jakarta-SemiBold" },
+  compactBarTitle: { fontSize: 14, color: colors.text.primary, flex: 1, marginRight: 12, fontFamily: "Jakarta-SemiBold" },
   compactBarBadge: { flexDirection: "row", alignItems: "center", gap: 4 },
-  compactBarBadgeText: { fontSize: 13, color: "#5BB8E8", fontFamily: "Jakarta-Medium" },
-  trackingTopSection: { backgroundColor: "#1A2A3A", paddingTop: 0 },
+  compactBarBadgeText: { fontSize: 13, color: colors.accent[400], fontFamily: "Jakarta-Medium" },
+  trackingTopSection: { backgroundColor: colors.accent[200], paddingTop: 0 },
   trackingStatusBarBg: {
     height: 40,
-    backgroundColor: "#5BB8E8",
+    backgroundColor: colors.accent[400],
     opacity: 0.85,
   },
   trackingInfoContainer: {
@@ -1046,8 +1052,8 @@ const styles = StyleSheet.create({
   },
   trackingLeftIcons: { width: 70, justifyContent: "space-around" },
   trackingIconButton: { alignItems: "center", marginBottom: 4 },
-  trackingIconLabel: { fontSize: 9, color: "#5BB8E8", marginTop: 2, fontWeight: "600" },
-  trackingIconStatus: { fontSize: 9, color: "white", marginTop: 1, fontWeight: "600" },
+  trackingIconLabel: { fontSize: 9, color: colors.accent[400], marginTop: 2, fontWeight: "600" },
+  trackingIconStatus: { fontSize: 9, color: colors.text.primary, marginTop: 1, fontWeight: "600" },
   trackingSpeedometerContainer: {
     flex: 1,
     alignItems: "center",
@@ -1057,36 +1063,36 @@ const styles = StyleSheet.create({
   },
   trackingDistanceRow: { flexDirection: "row", alignItems: "center", marginTop: 0 },
   trackingDistanceIcon: { marginRight: 6 },
-  trackingTotalDistance: { fontSize: 14, fontWeight: "600", color: "white" },
-  trackingCurrentSpeed: { fontSize: 20, fontWeight: "bold", color: "white", marginTop: -2 },
+  trackingTotalDistance: { fontSize: 14, fontWeight: "600", color: colors.text.primary },
+  trackingCurrentSpeed: { fontSize: 20, fontWeight: "bold", color: colors.text.primary, marginTop: -2 },
   trackingRightInfo: { width: 100, justifyContent: "flex-start", gap: 4 },
   trackingStatusCard: {
-    backgroundColor: "rgba(30, 58, 82, 0.6)",
+    backgroundColor: colors.surface.card,
     borderRadius: 8,
     padding: 6,
     borderWidth: 1,
-    borderColor: "#5BB8E8",
+    borderColor: colors.surface.border,
     marginBottom: 2,
   },
   trackingStatusHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  trackingStatusText: { color: "#5BB8E8", fontSize: 12, fontWeight: "600" },
-  trackingStatusLabel: { color: "white", fontSize: 12, fontWeight: "bold", marginTop: 4 },
+  trackingStatusText: { color: colors.accent[400], fontSize: 12, fontWeight: "600" },
+  trackingStatusLabel: { color: colors.text.primary, fontSize: 12, fontWeight: "bold", marginTop: 4 },
   trackingInfoCard: {
-    backgroundColor: "rgba(30, 58, 82, 0.6)",
+    backgroundColor: colors.surface.card,
     borderRadius: 8,
     padding: 6,
     borderWidth: 1,
-    borderColor: "#5BB8E8",
+    borderColor: colors.surface.border,
     marginBottom: 2,
   },
   trackingInfoRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  trackingInfoDate: { color: "white", fontSize: 9, fontWeight: "600" },
-  trackingInfoLabel: { color: "#A8D8F0", fontSize: 11, marginTop: 2 },
-  trackingInfoTime: { color: "white", fontSize: 11, fontWeight: "600", marginTop: 2 },
+  trackingInfoDate: { color: colors.text.primary, fontSize: 9, fontWeight: "600" },
+  trackingInfoLabel: { color: colors.text.secondary, fontSize: 11, marginTop: 2 },
+  trackingInfoTime: { color: colors.text.primary, fontSize: 11, fontWeight: "600", marginTop: 2 },
   trackingAddressBar: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(30, 58, 82, 0.8)",
+    backgroundColor: colors.surface.card,
     borderRadius: 10,
     paddingVertical: 5,
     paddingHorizontal: 8,
@@ -1094,30 +1100,30 @@ const styles = StyleSheet.create({
     marginTop: 2,
     marginBottom: 4,
     borderWidth: 1,
-    borderColor: "#5BB8E8",
+    borderColor: colors.surface.border,
   },
-  trackingAddressText: { flex: 1, color: "#A8D8F0", fontSize: 10, marginLeft: 4, lineHeight: 14 },
+  trackingAddressText: { flex: 1, color: colors.text.secondary, fontSize: 10, marginLeft: 4, lineHeight: 14 },
   header: {
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(91, 184, 232, 0.2)",
+    borderBottomColor: colors.surface.border,
   },
   headerWithDone: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   headerTextWrap: { flex: 1 },
-  headerTitle: { fontSize: 22, fontWeight: "700", color: "#fff", fontFamily: "Jakarta-Bold" },
-  headerSubtitle: { fontSize: 13, color: "#A8D8F0", marginTop: 2, fontFamily: "Jakarta-Medium" },
+  headerTitle: { fontSize: 22, fontWeight: "700", color: colors.text.primary, fontFamily: "Jakarta-Bold" },
+  headerSubtitle: { fontSize: 13, color: colors.text.secondary, marginTop: 2, fontFamily: "Jakarta-Medium" },
   doneButton: { paddingVertical: 8, paddingHorizontal: 14 },
-  doneButtonText: { fontSize: 16, color: "#5BB8E8", fontFamily: "Jakarta-SemiBold" },
+  doneButtonText: { fontSize: 16, color: colors.accent[400], fontFamily: "Jakarta-SemiBold" },
   controlsCard: {
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: "rgba(17, 30, 44, 0.6)",
+    backgroundColor: colors.surface.card,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(91, 184, 232, 0.15)",
+    borderBottomColor: colors.surface.border,
   },
-  label: { fontSize: 12, color: "#A8D8F0", marginBottom: 8, fontFamily: "Jakarta-Medium" },
+  label: { fontSize: 12, color: colors.text.secondary, marginBottom: 8, fontFamily: "Jakarta-Medium" },
   deviceScroll: { marginBottom: 14, maxHeight: 44 },
   deviceChip: {
     flexDirection: "row",
@@ -1125,30 +1131,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 22,
-    backgroundColor: "#243345",
+    backgroundColor: colors.accent[100],
     marginRight: 10,
   },
-  deviceChipActive: { backgroundColor: "#5BB8E8" },
-  deviceChipText: { fontSize: 14, color: "#A8D8F0", fontFamily: "Jakarta-Medium" },
+  deviceChipActive: { backgroundColor: colors.accent[400] },
+  deviceChipText: { fontSize: 14, color: colors.text.secondary, fontFamily: "Jakarta-Medium" },
   deviceChipTextActive: { color: "#fff" },
-  placeholderText: { fontSize: 14, color: "#64748b", fontFamily: "Jakarta-Medium" },
+  placeholderText: { fontSize: 14, color: colors.text.muted, fontFamily: "Jakarta-Medium" },
   dateRow: { flexDirection: "row", alignItems: "flex-end", gap: 12 },
   dateBlock: { flex: 1 },
   dateButton: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#243345",
+    backgroundColor: colors.accent[100],
     paddingHorizontal: 14,
     paddingVertical: 12,
     borderRadius: 12,
     borderWidth: 2,
     borderColor: "transparent",
   },
-  dateButtonSuccess: { borderColor: "#5BB8E8" },
-  dateButtonText: { fontSize: 15, color: "#E2E8F0", fontFamily: "Jakarta-Medium", flex: 1 },
-  dateYear: { fontSize: 12, color: "#94A3B8" },
+  dateButtonSuccess: { borderColor: colors.accent[400] },
+  dateButtonText: { fontSize: 15, color: colors.text.primary, fontFamily: "Jakarta-Medium", flex: 1 },
+  dateYear: { fontSize: 12, color: colors.status.muted },
   quickDate: { paddingVertical: 12, paddingHorizontal: 12, justifyContent: "center" },
-  quickDateText: { fontSize: 14, color: "#5BB8E8", fontFamily: "Jakarta-Medium" },
+  quickDateText: { fontSize: 14, color: colors.accent[400], fontFamily: "Jakarta-Medium" },
   errorCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -1161,13 +1167,13 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   errorText: { flex: 1, color: "#FCA5A5", fontSize: 13, fontFamily: "Jakarta-Medium" },
-  retryButton: { paddingVertical: 6, paddingHorizontal: 12, backgroundColor: "#5BB8E8", borderRadius: 8 },
+  retryButton: { paddingVertical: 6, paddingHorizontal: 12, backgroundColor: colors.accent[400], borderRadius: 8 },
   retryButtonText: { color: "#fff", fontSize: 13, fontFamily: "Jakarta-SemiBold" },
   loadButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#5BB8E8",
+    backgroundColor: colors.accent[400],
     paddingVertical: 14,
     borderRadius: 14,
     marginTop: 16,
@@ -1178,45 +1184,45 @@ const styles = StyleSheet.create({
   mapContainerMax: { minHeight: 0 },
   mapContainerTracking: { position: "relative" },
   map: { flex: 1 },
-  loadingOverlay: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#1A2A3A" },
-  loadingText: { color: "#A8D8F0", marginTop: 12, fontSize: 14, fontFamily: "Jakarta-Medium" },
+  loadingOverlay: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.surface.light },
+  loadingText: { color: colors.text.secondary, marginTop: 12, fontSize: 14, fontFamily: "Jakarta-Medium" },
   emptyState: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     padding: 32,
-    backgroundColor: "#1A2A3A",
+    backgroundColor: colors.surface.light,
   },
   emptyIconWrap: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: "rgba(91, 184, 232, 0.15)",
+    backgroundColor: colors.accent[100],
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 16,
   },
-  emptyTitle: { fontSize: 18, fontWeight: "700", color: "#E2E8F0", marginBottom: 8, fontFamily: "Jakarta-Bold" },
-  emptySubtitle: { fontSize: 14, color: "#94A3B8", textAlign: "center", lineHeight: 20, fontFamily: "Jakarta-Medium" },
+  emptyTitle: { fontSize: 18, fontWeight: "700", color: colors.text.primary, marginBottom: 8, fontFamily: "Jakarta-Bold" },
+  emptySubtitle: { fontSize: 14, color: colors.status.muted, textAlign: "center", lineHeight: 20, fontFamily: "Jakarta-Medium" },
   speedCard: {
     position: "absolute",
     top: 16,
     right: 16,
-    backgroundColor: "rgba(17, 30, 44, 0.95)",
+    backgroundColor: colors.surface.card,
     borderRadius: 16,
     padding: 12,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#5BB8E8",
+    borderColor: colors.surface.border,
     minWidth: 100,
   },
-  speedCardLabel: { fontSize: 10, color: "#A8D8F0", marginBottom: 4, fontFamily: "Jakarta-Medium" },
-  speedCardValue: { color: "#fff", fontWeight: "700", fontSize: 13, marginTop: 4 },
+  speedCardLabel: { fontSize: 10, color: colors.text.secondary, marginBottom: 4, fontFamily: "Jakarta-Medium" },
+  speedCardValue: { color: colors.text.primary, fontWeight: "700", fontSize: 13, marginTop: 4 },
   speedCardCompact: {
     padding: 8,
     minWidth: 72,
   },
-  speedCardValueCompact: { color: "#fff", fontWeight: "700", fontSize: 14 },
+  speedCardValueCompact: { color: colors.text.primary, fontWeight: "700", fontSize: 14 },
   playbackBar: {
     position: "absolute",
     left: 12,
@@ -1228,15 +1234,15 @@ const styles = StyleSheet.create({
     padding: 10,
     paddingVertical: 8,
     borderRadius: 12,
-    backgroundColor: "rgba(17, 30, 44, 0.96)",
+    backgroundColor: colors.surface.card,
     borderWidth: 1,
-    borderColor: "#5BB8E8",
+    borderColor: colors.surface.border,
   },
   playButton: {
     width: 44,
     height: 44,
     borderRadius: 10,
-    backgroundColor: "#0A63A8",
+    backgroundColor: colors.accent[400],
     alignItems: "center",
     justifyContent: "center",
   },
@@ -1247,22 +1253,22 @@ const styles = StyleSheet.create({
   sliderBlock: { gap: 2 },
   sliderHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", minHeight: 16 },
   sliderLabel: { fontSize: 10, color: "#94A3B8", fontFamily: "Jakarta-Medium" },
-  sliderTime: { fontSize: 9, color: "#A8D8F0", fontFamily: "Jakarta-Medium", flex: 1, marginLeft: 4 },
-  sliderValue: { fontSize: 10, color: "#94A3B8", marginTop: 0, fontFamily: "Jakarta-Medium" },
-  sliderValueActive: { color: "#5BB8E8" },
+  sliderTime: { fontSize: 9, color: colors.text.secondary, fontFamily: "Jakarta-Medium", flex: 1, marginLeft: 4 },
+  sliderValue: { fontSize: 10, color: colors.status.muted, marginTop: 0, fontFamily: "Jakarta-Medium" },
+  sliderValueActive: { color: colors.accent[400] },
   sliderTouchArea: {
     paddingVertical: 12,
     marginVertical: -12,
     justifyContent: "center",
   },
-  sliderTrack: { height: 6, borderRadius: 3, backgroundColor: "#243345", position: "relative", justifyContent: "center" },
-  sliderFill: { position: "absolute", left: 0, top: 0, bottom: 0, backgroundColor: "#5BB8E8", borderRadius: 3 },
+  sliderTrack: { height: 6, borderRadius: 3, backgroundColor: colors.accent[100], position: "relative", justifyContent: "center" },
+  sliderFill: { position: "absolute", left: 0, top: 0, bottom: 0, backgroundColor: colors.accent[400], borderRadius: 3 },
   sliderThumb: {
     position: "absolute",
     width: 14,
     height: 14,
     borderRadius: 7,
-    backgroundColor: "#5BB8E8",
+    backgroundColor: colors.accent[400],
     borderWidth: 2,
     borderColor: "#fff",
     marginLeft: -7,
@@ -1273,9 +1279,9 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: "rgba(17, 30, 44, 0.92)",
+    backgroundColor: colors.surface.card,
     borderWidth: 2,
-    borderColor: "#5BB8E8",
+    borderColor: colors.surface.border,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -1283,16 +1289,17 @@ const styles = StyleSheet.create({
   infoStrip: {
     paddingHorizontal: 20,
     paddingVertical: 14,
-    backgroundColor: "#111E2C",
+    backgroundColor: colors.surface.card,
     borderTopWidth: 1,
-    borderTopColor: "rgba(91, 184, 232, 0.2)",
+    borderTopColor: colors.surface.border,
   },
   infoStripMain: { gap: 4 },
-  infoStripTitle: { fontSize: 16, fontWeight: "700", color: "#fff", fontFamily: "Jakarta-Bold" },
+  infoStripTitle: { fontSize: 16, fontWeight: "700", color: colors.text.primary, fontFamily: "Jakarta-Bold" },
   infoStripMeta: { gap: 2 },
-  infoStripMetaText: { fontSize: 12, color: "#94A3B8", fontFamily: "Jakarta-Medium" },
+  infoStripMetaText: { fontSize: 12, color: colors.status.muted, fontFamily: "Jakarta-Medium" },
   infoStripCompact: { paddingVertical: 8, paddingHorizontal: 16 },
   infoStripTitleCompact: { fontSize: 14 },
 });
+}
 
 export default History;

@@ -1,6 +1,9 @@
-import React, { useEffect, useRef, useState, useMemo } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { View, Text, ActivityIndicator, StyleSheet, TouchableOpacity, Platform, Dimensions } from "react-native";
 import Mapbox from "@rnmapbox/maps";
+import { useColorScheme } from "nativewind";
+
+import { getThemeColors, theme } from "@/constants/theme";
 import { useDeviceStore, useLocationStore } from "@/store";
 import { Device } from "@/types/type";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -16,6 +19,9 @@ if (accessToken) {
 }
 
 const Tracking = () => {
+  const { colorScheme } = useColorScheme();
+  const colors = getThemeColors(colorScheme === "dark" ? "dark" : "light");
+  const styles = useMemo(() => createTrackingStyles(colors), [colors]);
   const devices = useDeviceStore((s) => s.devices);
   const currentLocation = useDeviceStore((s) => s.currentLocation);
   const setCurrentLocation = useDeviceStore((s) => s.setCurrentLocation);
@@ -139,27 +145,27 @@ const Tracking = () => {
   }, [batteryLevel]);
 
   const batteryColor = useMemo(() => {
-    if (batteryLevel == null) return "#94A3B8";
-    if (batteryLevel > 40) return "#10B981";
-    if (batteryLevel > 20) return "#F59E0B";
-    return "#EF4444";
-  }, [batteryLevel]);
+    if (batteryLevel == null) return colors.status.muted;
+    if (batteryLevel > 40) return colors.status.success;
+    if (batteryLevel > 20) return colors.status.warning;
+    return colors.status.error;
+  }, [batteryLevel, colors]);
 
   if (!targetLatitude || !targetLongitude) {
     return (
-      <View className="flex-1 items-center justify-center" style={{ backgroundColor: "#1A2A3A" }}>
-        <ActivityIndicator size="large" color="#5BB8E8" />
-        <Text className="text-gray-400 mt-4 font-JakartaMedium">Getting your location...</Text>
+      <View className="flex-1 items-center justify-center bg-surface-light dark:bg-slate-900">
+        <ActivityIndicator size="large" color={colors.accent[400]} />
+        <Text className="text-status-muted mt-4 font-JakartaMedium">Getting your location...</Text>
       </View>
     );
   }
 
   if (Platform.OS === "web") {
     return (
-      <View className="flex-1 items-center justify-center p-5" style={{ backgroundColor: "#1A2A3A" }}>
-        <Ionicons name="map" size={64} color="#5BB8E8" />
-        <Text className="text-xl font-JakartaBold text-white mt-4 text-center">Live Tracking</Text>
-        <Text className="text-base font-JakartaMedium text-gray-400 mt-2 text-center">
+      <View className="flex-1 items-center justify-center p-5 bg-surface-light dark:bg-slate-900">
+        <Ionicons name="map" size={64} color={colors.accent[400]} />
+        <Text className="text-xl font-JakartaBold text-slate-900 mt-4 text-center">Live Tracking</Text>
+        <Text className="text-base font-JakartaMedium text-status-muted mt-2 text-center">
           Map view is only available on mobile devices
         </Text>
       </View>
@@ -167,12 +173,12 @@ const Tracking = () => {
   }
 
   return (
-    <View className="flex-1" style={{ backgroundColor: "#1A2A3A" }}>
+    <View className="flex-1 bg-surface-light dark:bg-slate-900">
       {/* ═══ Top Info Section ═══ */}
       <View style={[styles.topSection, { height: SCREEN_HEIGHT * 0.30 - 6 }]}>
         <View style={styles.statusBarBg}>
           <View style={styles.statusBadge}>
-            <View style={[styles.statusDot, { backgroundColor: device?.status === "online" ? "#10B981" : "#9E9E9E" }]} />
+            <View style={[styles.statusDot, { backgroundColor: device?.status === "online" ? colors.status.success : colors.status.muted }]} />
             <Text style={styles.statusBadgeText}>{status}</Text>
           </View>
           <Text style={styles.deviceNameText} numberOfLines={1}>{device?.name || "Tracker"}</Text>
@@ -189,7 +195,7 @@ const Tracking = () => {
               </Text>
             </View>
             <View style={styles.iconButton}>
-              <MaterialCommunityIcons name="key" size={20} color="#5BB8E8" />
+              <MaterialCommunityIcons name="key" size={20} color={colors.accent[400]} />
               <Text style={styles.iconLabel}>Ignition</Text>
               <Text style={styles.iconStatus}>
                 {device?.status === "online" ? "On" : "Off"}
@@ -202,7 +208,7 @@ const Tracking = () => {
             <Speedometer speed={speed} maxSpeed={120} size="large" />
             <Text style={styles.currentSpeed}>{speed.toFixed(0)} KM/H</Text>
             <View style={styles.distanceRow}>
-              <MaterialCommunityIcons name="road-variant" size={16} color="#5BB8E8" style={{ marginRight: 4 }} />
+              <MaterialCommunityIcons name="road-variant" size={16} color={colors.accent[400]} style={{ marginRight: 4 }} />
               <Text style={styles.lastSeenText}>{formatTimeAgo(device?.last_seen)}</Text>
             </View>
           </View>
@@ -212,13 +218,13 @@ const Tracking = () => {
             <View style={styles.infoCard}>
               <View style={styles.infoRow}>
                 <Text style={styles.infoCardLabel}>{status}</Text>
-                <Ionicons name={device?.status === "online" ? "radio-button-on" : "radio-button-off"} size={14} color={device?.status === "online" ? "#10B981" : "#9E9E9E"} />
+                <Ionicons name={device?.status === "online" ? "radio-button-on" : "radio-button-off"} size={14} color={device?.status === "online" ? colors.status.success : colors.status.muted} />
               </View>
             </View>
             <View style={styles.infoCard}>
               <View style={styles.infoRow}>
                 <Text style={styles.infoCardLabel}>Updated</Text>
-                <Ionicons name="time-outline" size={14} color="#5BB8E8" />
+                <Ionicons name="time-outline" size={14} color={colors.accent[400]} />
               </View>
               <Text style={styles.infoCardValue}>{formatTimeAgo(device?.last_seen)}</Text>
             </View>
@@ -226,7 +232,7 @@ const Tracking = () => {
               <View style={styles.infoCard}>
                 <View style={styles.infoRow}>
                   <Text style={styles.infoCardLabel}>Speed</Text>
-                  <Ionicons name="speedometer-outline" size={14} color="#5BB8E8" />
+                  <Ionicons name="speedometer-outline" size={14} color={colors.accent[400]} />
                 </View>
                 <Text style={styles.infoCardValue}>{speed.toFixed(0)} km/h</Text>
               </View>
@@ -236,7 +242,7 @@ const Tracking = () => {
 
         {/* Address bar */}
         <View style={styles.addressBar}>
-          <Ionicons name="location" size={16} color="#5BB8E8" />
+          <Ionicons name="location" size={16} color={colors.accent[400]} />
           <Text style={styles.addressText} numberOfLines={1}>{streetName}</Text>
         </View>
       </View>
@@ -289,13 +295,13 @@ const Tracking = () => {
         {/* Left map controls */}
         <View style={styles.mapControls}>
           <TouchableOpacity onPress={handleToggleStyle} style={styles.mapControlBtn}>
-            <MaterialCommunityIcons name="layers" size={22} color="#5BB8E8" />
+            <MaterialCommunityIcons name="layers" size={22} color={colors.accent[400]} />
           </TouchableOpacity>
           <TouchableOpacity onPress={handleToggle3D} style={styles.mapControlBtn}>
-            <MaterialCommunityIcons name="cube-outline" size={22} color="#5BB8E8" />
+            <MaterialCommunityIcons name="cube-outline" size={22} color={colors.accent[400]} />
           </TouchableOpacity>
           <TouchableOpacity onPress={handleRecenter} style={styles.mapControlBtn} accessibilityLabel="Recenter">
-            <Ionicons name="navigate-circle" size={22} color="#5BB8E8" />
+            <Ionicons name="navigate-circle" size={22} color={colors.accent[400]} />
           </TouchableOpacity>
         </View>
       </View>
@@ -303,14 +309,15 @@ const Tracking = () => {
   );
 };
 
-const styles = StyleSheet.create({
+function createTrackingStyles(colors: ReturnType<typeof getThemeColors>) {
+  return StyleSheet.create({
   topSection: {
-    backgroundColor: "#1A2A3A",
+    backgroundColor: colors.accent[200],
     paddingTop: 0,
   },
   statusBarBg: {
     height: 44,
-    backgroundColor: "rgba(91, 184, 232, 0.15)",
+    backgroundColor: colors.accent[100],
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -320,7 +327,7 @@ const styles = StyleSheet.create({
   statusBadge: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(17, 30, 44, 0.8)",
+    backgroundColor: colors.surface.card,
     paddingHorizontal: 10,
     paddingVertical: 3,
     borderRadius: 12,
@@ -332,12 +339,12 @@ const styles = StyleSheet.create({
     marginRight: 5,
   },
   statusBadgeText: {
-    color: "#A8D8F0",
+    color: colors.text.secondary,
     fontSize: 11,
     fontWeight: "600",
   },
   deviceNameText: {
-    color: "#fff",
+    color: colors.text.primary,
     fontSize: 13,
     fontWeight: "700",
     maxWidth: 160,
@@ -358,13 +365,13 @@ const styles = StyleSheet.create({
   },
   iconLabel: {
     fontSize: 9,
-    color: "#94A3B8",
+    color: colors.status.muted,
     marginTop: 2,
     fontWeight: "600",
   },
   iconStatus: {
     fontSize: 10,
-    color: "white",
+    color: colors.text.primary,
     marginTop: 1,
     fontWeight: "700",
   },
@@ -377,7 +384,7 @@ const styles = StyleSheet.create({
   currentSpeed: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "white",
+    color: colors.text.primary,
     marginTop: -2,
   },
   distanceRow: {
@@ -388,7 +395,7 @@ const styles = StyleSheet.create({
   lastSeenText: {
     fontSize: 11,
     fontWeight: "600",
-    color: "#A8D8F0",
+    color: colors.text.secondary,
   },
   rightInfo: {
     width: 90,
@@ -396,11 +403,11 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   infoCard: {
-    backgroundColor: "rgba(30, 58, 82, 0.6)",
+    backgroundColor: colors.surface.card,
     borderRadius: 8,
     padding: 6,
     borderWidth: 1,
-    borderColor: "rgba(91, 184, 232, 0.3)",
+    borderColor: colors.surface.border,
   },
   infoRow: {
     flexDirection: "row",
@@ -408,12 +415,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   infoCardLabel: {
-    color: "#94A3B8",
+    color: colors.status.muted,
     fontSize: 10,
     fontWeight: "600",
   },
   infoCardValue: {
-    color: "#fff",
+    color: colors.text.primary,
     fontSize: 11,
     fontWeight: "700",
     marginTop: 2,
@@ -421,7 +428,7 @@ const styles = StyleSheet.create({
   addressBar: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(30, 58, 82, 0.8)",
+    backgroundColor: colors.surface.card,
     borderRadius: 10,
     paddingVertical: 6,
     paddingHorizontal: 10,
@@ -429,11 +436,11 @@ const styles = StyleSheet.create({
     marginTop: 2,
     marginBottom: 4,
     borderWidth: 1,
-    borderColor: "rgba(91, 184, 232, 0.3)",
+    borderColor: colors.surface.border,
   },
   addressText: {
     flex: 1,
-    color: "#A8D8F0",
+    color: colors.text.secondary,
     fontSize: 11,
     marginLeft: 6,
     lineHeight: 15,
@@ -445,9 +452,9 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "rgba(17, 30, 44, 0.92)",
+    backgroundColor: colors.surface.card,
     borderWidth: 2,
-    borderColor: "rgba(255, 255, 255, 0.1)",
+    borderColor: colors.surface.border,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
@@ -462,12 +469,13 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: "rgba(17, 30, 44, 0.92)",
+    backgroundColor: colors.surface.card,
     borderWidth: 2,
-    borderColor: "#5BB8E8",
+    borderColor: colors.surface.border,
     alignItems: "center",
     justifyContent: "center",
   },
 });
+}
 
 export default Tracking;

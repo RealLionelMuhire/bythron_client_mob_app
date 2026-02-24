@@ -91,11 +91,11 @@ const SignIn = () => {
   }
 
   return (
-    <ScrollView className="flex-1 bg-white">
-      <View className="flex-1 bg-white">
+    <ScrollView className="flex-1 bg-white dark:bg-slate-900">
+      <View className="flex-1 bg-white dark:bg-slate-900">
         <View className="relative w-full h-[250px]">
           <Image source={images.signUpCar} className="z-0 w-full h-[250px]" resizeMode="cover" />
-          <Text className="text-2xl text-black font-JakartaSemiBold absolute bottom-5 left-5">
+          <Text className="text-2xl text-black dark:text-white font-JakartaSemiBold absolute bottom-5 left-5">
             Welcome 👋
           </Text>
         </View>
@@ -132,18 +132,18 @@ const SignIn = () => {
 
               <Link
                 href="/sign-up"
-                className="text-lg text-center text-general-200 mt-10"
+                className="text-lg text-center text-slate-600 dark:text-slate-400 mt-10"
               >
                 Don't have an account?{" "}
-                <Text className="text-primary-500">Sign Up</Text>
+                <Text className="text-accent-500">Sign Up</Text>
               </Link>
             </>
           ) : (
             <>
-              <Text className="text-2xl font-JakartaBold mb-2">
+              <Text className="text-2xl font-JakartaBold mb-2 text-slate-900 dark:text-slate-100">
                 Verify Your Email
               </Text>
-              <Text className="text-base text-general-200 mb-5">
+              <Text className="text-base text-slate-600 dark:text-slate-400 mb-5">
                 Enter the verification code sent to your email
               </Text>
 

@@ -7,6 +7,8 @@ import "react-native-reanimated";
 import { LogBox } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
+import { ThemeInitializer } from "@/components/ThemeInitializer";
+import { ThemeWrapper } from "@/components/ThemeWrapper";
 import { tokenCache } from "@/lib/auth";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
@@ -46,7 +48,10 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ClerkProvider tokenCache={tokenCache} publishableKey={publishableKey}>
-        <Slot />
+        <ThemeInitializer />
+        <ThemeWrapper>
+          <Slot />
+        </ThemeWrapper>
       </ClerkProvider>
     </GestureHandlerRootView>
   );

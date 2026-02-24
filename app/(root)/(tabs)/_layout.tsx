@@ -1,31 +1,35 @@
 import { Tabs, usePathname } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { useColorScheme } from "nativewind";
 
+import { getThemeColors } from "@/constants/theme";
 import { useDeviceStore } from "@/store";
-
-const defaultTabBarStyle = {
-  backgroundColor: "rgba(26, 42, 58, 0.95)",
-  borderTopWidth: 1,
-  borderTopColor: "#5BB8E8",
-  height: 80,
-  paddingTop: 4,
-  position: "absolute" as const,
-  left: 0,
-  right: 0,
-  bottom: 0,
-};
 
 export default function Layout() {
   const pathname = usePathname();
   const historyFullScreen = useDeviceStore((s) => s.historyFullScreen);
   const hideTabBar = pathname?.includes("history") && historyFullScreen;
+  const { colorScheme } = useColorScheme();
+  const colors = getThemeColors(colorScheme === "dark" ? "dark" : "light");
+
+  const defaultTabBarStyle = {
+    backgroundColor: colors.surface.card,
+    borderTopWidth: 1,
+    borderTopColor: colors.surface.border,
+    height: 80,
+    paddingTop: 4,
+    position: "absolute" as const,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  };
 
   return (
     <Tabs
       initialRouteName="alerts"
       screenOptions={{
-        tabBarActiveTintColor: "white",
-        tabBarInactiveTintColor: "#A8D8F0",
+        tabBarActiveTintColor: colors.accent[400],
+        tabBarInactiveTintColor: colors.text.muted,
         tabBarShowLabel: true,
         tabBarLabelStyle: {
           fontSize: 11,
@@ -45,6 +49,16 @@ export default function Layout() {
           title: "Home",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="home" size={size} color={color} />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="vehicles"
+        options={{
+          title: "Vehicles",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="car-outline" size={size} color={color} />
           ),
         }}
       />

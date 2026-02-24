@@ -12,8 +12,10 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
+import { DIALOG_COLORS, getThemeColors } from "@/constants/theme";
 import { fetchAPI } from "@/lib/fetch";
 import { useDeviceStore } from "@/store";
+import { useColorScheme } from "nativewind";
 
 type AlarmExtra = "speed_kmh" | "radius_meters" | null;
 type DialogType = "success" | "error" | "warning" | "info";
@@ -26,13 +28,6 @@ interface AlarmConfig {
   onMsg: string;
   offMsg: string;
 }
-
-const DIALOG_COLORS: Record<DialogType, { bg: string; icon: string; btn: string }> = {
-  success: { bg: "#ECFDF5", icon: "#10B981", btn: "#10B981" },
-  error:   { bg: "#FEF2F2", icon: "#EF4444", btn: "#EF4444" },
-  warning: { bg: "#FFFBEB", icon: "#F59E0B", btn: "#F59E0B" },
-  info:    { bg: "#EFF6FF", icon: "#5BB8E8", btn: "#5BB8E8" },
-};
 
 const ALARMS: AlarmConfig[] = [
   { label: "SOS alarm", endpoint: "/alarm/sos", extra: null, icon: "alert-circle",
@@ -56,6 +51,9 @@ const ALARMS: AlarmConfig[] = [
 ];
 
 const Alerts = () => {
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === "dark";
+  const colors = getThemeColors(isDark ? "dark" : "light");
   const devices = useDeviceStore((s) => s.devices);
   const selectedDevice = useDeviceStore((s) => s.selectedDevice);
   const setSelectedDevice = useDeviceStore((s) => s.setSelectedDevice);
@@ -134,23 +132,22 @@ const Alerts = () => {
   }, [extraModal, extraValue, sendAlarm, showDialog]);
 
   return (
-    <SafeAreaView className="flex-1" style={{ backgroundColor: "#F7FAFF" }}>
+    <SafeAreaView className={`flex-1 ${isDark ? "bg-slate-900" : "bg-surface-light"}`}>
       <ScrollView className="px-5" contentContainerStyle={{ paddingBottom: 120, paddingTop: 10 }}>
-        <Text className="text-2xl font-JakartaBold my-5">Alerts</Text>
+        <Text className={`text-2xl font-JakartaBold my-5 ${isDark ? "text-slate-100" : "text-slate-900"}`}>Alerts</Text>
 
         {/* Device selector */}
         {devices.length > 1 && (
-          <View className="bg-white rounded-2xl shadow-sm shadow-neutral-300 px-5 py-4 mb-4">
-            <Text className="text-sm font-JakartaMedium text-gray-500 mb-2">Select device</Text>
+          <View className={`rounded-2xl shadow-sm border px-5 py-4 mb-4 ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200"}`}>
+            <Text className={`text-sm font-JakartaMedium mb-2 ${isDark ? "text-slate-400" : "text-slate-600"}`}>Select device</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               {devices.map((d) => (
                 <TouchableOpacity
                   key={d.id}
                   onPress={() => setSelectedDevice(d.id)}
-                  className="mr-3 px-4 py-2 rounded-xl"
-                  style={{ backgroundColor: deviceId === d.id ? "#5BB8E8" : "#E2E8F0" }}
+                  className={`mr-3 px-4 py-2 rounded-xl ${deviceId === d.id ? "bg-accent-400" : isDark ? "bg-slate-600" : "bg-slate-200"}`}
                 >
-                  <Text className="text-sm font-JakartaBold" style={{ color: deviceId === d.id ? "#fff" : "#475569" }}>{d.name}</Text>
+                  <Text className={`text-sm font-JakartaBold ${deviceId === d.id ? "text-white" : isDark ? "text-slate-300" : "text-slate-600"}`}>{d.name}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -158,39 +155,39 @@ const Alerts = () => {
         )}
 
         {deviceId == null ? (
-          <View className="bg-white rounded-2xl shadow-sm shadow-neutral-300 px-5 py-8 items-center mb-4">
-            <Ionicons name="notifications-off" size={48} color="#94A3B8" />
-            <Text className="text-base font-JakartaMedium text-slate-500 mt-3">No device available</Text>
-            <Text className="text-xs font-JakartaMedium text-slate-400 mt-1">Add a tracker to manage alerts.</Text>
+          <View className={`rounded-2xl shadow-sm border px-5 py-8 items-center mb-4 ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200"}`}>
+            <Ionicons name="notifications-off" size={48} color={colors.status.muted} />
+            <Text className={`text-base font-JakartaMedium mt-3 ${isDark ? "text-slate-400" : "text-slate-600"}`}>No device available</Text>
+            <Text className={`text-xs font-JakartaMedium mt-1 ${isDark ? "text-slate-400" : "text-slate-500"}`}>Add a tracker to manage alerts.</Text>
           </View>
         ) : (
-          <View className="bg-white rounded-2xl shadow-sm shadow-neutral-300 px-5 py-4 mb-4">
+          <View className={`rounded-2xl shadow-sm border px-5 py-4 mb-4 ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200"}`}>
             <View className="flex-row items-center mb-4">
-              <Ionicons name="notifications" size={22} color="#E36060" />
-              <Text className="text-lg font-JakartaBold text-slate-800 ml-2">Alert settings</Text>
+              <Ionicons name="notifications" size={22} color={colors.status.error} />
+              <Text className={`text-lg font-JakartaBold ml-2 ${isDark ? "text-slate-100" : "text-slate-900"}`}>Alert settings</Text>
             </View>
-            <Text className="text-xs font-JakartaMedium text-gray-400 mb-3">Toggle alarms on the tracker device</Text>
+            <Text className={`text-xs font-JakartaMedium mb-3 ${isDark ? "text-slate-400" : "text-slate-500"}`}>Toggle alarms on the tracker device</Text>
 
             {ALARMS.map((alarm) => (
               <View
                 key={alarm.label}
-                className="flex-row items-center justify-between py-3 border-b border-neutral-100"
+                className={`flex-row items-center justify-between py-3 border-b ${isDark ? "border-slate-700" : "border-slate-200"}`}
               >
                 <View className="flex-row items-center flex-1">
-                  <Ionicons name={alarm.icon} size={18} color={alarmState[alarm.label] ? "#5BB8E8" : "#94A3B8"} />
-                  <Text className="text-base font-JakartaMedium text-slate-700 ml-2">{alarm.label}</Text>
+                  <Ionicons name={alarm.icon} size={18} color={alarmState[alarm.label] ? colors.accent[400] : colors.status.muted} />
+                  <Text className={`text-base font-JakartaMedium ml-2 ${isDark ? "text-slate-300" : "text-slate-700"}`}>{alarm.label}</Text>
                 </View>
                 <View className="flex-row items-center">
-                  <Text className="text-xs font-JakartaBold mr-2" style={{ color: alarmState[alarm.label] ? "#5BB8E8" : "#94A3B8" }}>
+                  <Text className={`text-xs font-JakartaBold mr-2 ${alarmState[alarm.label] ? "text-accent-400" : "text-status-muted"}`}>
                     {alarmState[alarm.label] ? "ON" : "OFF"}
                   </Text>
                   {loadingKey === alarm.label ? (
-                    <ActivityIndicator size="small" color="#5BB8E8" />
+                    <ActivityIndicator size="small" color={colors.accent[400]} />
                   ) : (
                     <Switch
                       value={alarmState[alarm.label]}
                       onValueChange={(v) => handleAlarmToggle(alarm, v)}
-                      trackColor={{ false: "#CBD5E1", true: "#5BB8E8" }}
+                      trackColor={{ false: "#CBD5E1", true: colors.accent[400] }}
                       thumbColor="#FFFFFF"
                     />
                   )}
@@ -204,15 +201,15 @@ const Alerts = () => {
       {/* Dialog */}
       <Modal visible={dialog.visible} transparent animationType="fade">
         <View className="flex-1 justify-center items-center px-6" style={{ backgroundColor: "rgba(0,0,0,0.45)" }}>
-          <View className="bg-white rounded-2xl w-full max-w-sm overflow-hidden">
+          <View className={`rounded-2xl w-full max-w-sm overflow-hidden ${isDark ? "bg-slate-800" : "bg-white"}`}>
             <View className="items-center pt-6 pb-4 px-5" style={{ backgroundColor: DIALOG_COLORS[dialog.type].bg }}>
-              <View className="w-16 h-16 rounded-full items-center justify-center mb-3" style={{ backgroundColor: "#fff" }}>
+              <View className={`w-16 h-16 rounded-full items-center justify-center mb-3 ${isDark ? "bg-slate-700" : "bg-white"}`}>
                 <Ionicons name={dialog.icon} size={40} color={DIALOG_COLORS[dialog.type].icon} />
               </View>
-              <Text className="text-lg font-JakartaBold text-slate-800 text-center">{dialog.title}</Text>
+              <Text className={`text-lg font-JakartaBold text-center ${isDark ? "text-slate-100" : "text-slate-800"}`}>{dialog.title}</Text>
             </View>
             <View className="px-5 pt-4 pb-5">
-              <Text className="text-sm font-JakartaMedium text-slate-600 text-center leading-5">{dialog.message}</Text>
+              <Text className={`text-sm font-JakartaMedium text-center leading-5 ${isDark ? "text-slate-300" : "text-slate-600"}`}>{dialog.message}</Text>
               <TouchableOpacity
                 onPress={() => setDialog((p) => ({ ...p, visible: false }))}
                 className="mt-5 py-3 rounded-xl items-center"
@@ -228,26 +225,26 @@ const Alerts = () => {
       {/* Extra value modal */}
       <Modal visible={!!extraModal} transparent animationType="fade">
         <View className="flex-1 justify-center items-center px-6" style={{ backgroundColor: "rgba(0,0,0,0.45)" }}>
-          <View className="bg-white rounded-2xl w-full max-w-sm overflow-hidden">
-            <View className="items-center pt-6 pb-4 px-5" style={{ backgroundColor: "#EFF6FF" }}>
-              <View className="w-16 h-16 rounded-full items-center justify-center mb-3" style={{ backgroundColor: "#fff" }}>
+          <View className={`rounded-2xl w-full max-w-sm overflow-hidden ${isDark ? "bg-slate-800" : "bg-white"}`}>
+            <View className={`items-center pt-6 pb-4 px-5 ${isDark ? "bg-slate-700" : "bg-sky-50"}`}>
+              <View className={`w-16 h-16 rounded-full items-center justify-center mb-3 ${isDark ? "bg-slate-600" : "bg-white"}`}>
                 <Ionicons
                   name={extraModal?.alarm.extra === "speed_kmh" ? "speedometer" : "locate"}
                   size={40}
-                  color="#5BB8E8"
+                  color={colors.accent[400]}
                 />
               </View>
-              <Text className="text-lg font-JakartaBold text-slate-800 text-center">
+              <Text className={`text-lg font-JakartaBold text-center ${isDark ? "text-slate-100" : "text-slate-800"}`}>
                 {extraModal?.alarm.extra === "speed_kmh" ? "Set speed limit" : "Set displacement radius"}
               </Text>
-              <Text className="text-xs font-JakartaMedium text-slate-500 text-center mt-1">
+              <Text className={`text-xs font-JakartaMedium text-center mt-1 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
                 {extraModal?.alarm.extra === "speed_kmh"
                   ? "You will be notified if the vehicle exceeds this speed."
                   : "You will be notified if the vehicle moves beyond this distance."}
               </Text>
             </View>
             <View className="px-5 pt-4 pb-5">
-              <Text className="text-sm font-JakartaMedium text-slate-600 mb-2">
+              <Text className={`text-sm font-JakartaMedium mb-2 ${isDark ? "text-slate-400" : "text-slate-600"}`}>
                 {extraModal?.alarm.extra === "speed_kmh" ? "Speed (km/h)" : "Radius (meters)"}
               </Text>
               <TextInput
@@ -255,19 +252,18 @@ const Alerts = () => {
                 onChangeText={setExtraValue}
                 keyboardType="number-pad"
                 placeholder={extraModal?.alarm.extra === "speed_kmh" ? "120" : "200"}
-                className="border border-slate-300 rounded-xl px-4 py-3 text-base mb-4"
+                className={`border rounded-xl px-4 py-3 text-base mb-4 ${isDark ? "border-slate-600 text-slate-100 bg-slate-800" : "border-slate-300 text-slate-900 bg-white"}`}
               />
               <View className="flex-row gap-3">
                 <TouchableOpacity
                   onPress={() => setExtraModal(null)}
-                  className="flex-1 py-3 rounded-xl items-center border border-slate-300"
+                  className={`flex-1 py-3 rounded-xl items-center border ${isDark ? "border-slate-600" : "border-slate-300"}`}
                 >
-                  <Text className="font-JakartaBold text-slate-600">Cancel</Text>
+                  <Text className={`font-JakartaBold ${isDark ? "text-slate-300" : "text-slate-600"}`}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={submitExtraModal}
-                  className="flex-1 py-3 rounded-xl items-center"
-                  style={{ backgroundColor: "#5BB8E8" }}
+                  className="flex-1 py-3 rounded-xl items-center bg-accent-400"
                 >
                   <Text className="font-JakartaBold text-white">Activate</Text>
                 </TouchableOpacity>

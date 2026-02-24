@@ -12,23 +12,22 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useUser, useAuth } from "@clerk/clerk-expo";
+import { NativeWindStyleSheet, useColorScheme } from "nativewind";
 import { router } from "expo-router";
 
+import { DIALOG_COLORS, getThemeColors } from "@/constants/theme";
 import { fetchAPI } from "@/lib/fetch";
+import { saveColorScheme } from "@/lib/theme";
 import { useDeviceStore } from "@/store";
 
 type DialogType = "success" | "error" | "warning" | "info";
 
-const DIALOG_COLORS: Record<DialogType, { bg: string; icon: string; btn: string }> = {
-  success: { bg: "#ECFDF5", icon: "#10B981", btn: "#10B981" },
-  error:   { bg: "#FEF2F2", icon: "#EF4444", btn: "#EF4444" },
-  warning: { bg: "#FFFBEB", icon: "#F59E0B", btn: "#F59E0B" },
-  info:    { bg: "#EFF6FF", icon: "#5BB8E8", btn: "#5BB8E8" },
-};
-
 const Settings = () => {
   const { user } = useUser();
   const { signOut } = useAuth();
+  const { colorScheme, setColorScheme } = useColorScheme();
+  const isDark = colorScheme === "dark";
+  const colors = getThemeColors(isDark ? "dark" : "light");
 
   const devices = useDeviceStore((s) => s.devices);
   const selectedDevice = useDeviceStore((s) => s.selectedDevice);
@@ -53,7 +52,7 @@ const Settings = () => {
   const [confirmModal, setConfirmModal] = useState<{
     visible: boolean; title: string; message: string; icon: keyof typeof Ionicons.glyphMap;
     iconColor: string; label: string; color: string; onConfirm: () => void;
-  }>({ visible: false, title: "", message: "", icon: "alert-circle", iconColor: "#E36060", label: "", color: "#E36060", onConfirm: () => {} });
+  }>({ visible: false, title: "", message: "", icon: "alert-circle", iconColor: colors.status.error, label: "", color: colors.status.error, onConfirm: () => {} });
 
   const showDialog = useCallback((type: DialogType, title: string, message: string, icon?: keyof typeof Ionicons.glyphMap) => {
     const defaults: Record<DialogType, keyof typeof Ionicons.glyphMap> = {
@@ -75,15 +74,25 @@ const Settings = () => {
     }
   }, [deviceId, showDialog]);
 
+  const handleDarkModeToggle = useCallback(
+    (value: boolean) => {
+      const next = value ? "dark" : "light";
+      setColorScheme(next);
+      NativeWindStyleSheet.setColorScheme(next);
+      saveColorScheme(next);
+    },
+    [setColorScheme]
+  );
+
   const handleSignOut = useCallback(() => {
     setConfirmModal({
       visible: true,
       title: "Sign out?",
       message: "You will need to sign in again to access your account and devices.",
       icon: "log-out",
-      iconColor: "#DC2626",
+      iconColor: colors.status.error,
       label: "Sign out",
-      color: "#DC2626",
+      color: colors.status.error,
       onConfirm: () => {
         setConfirmModal((p) => ({ ...p, visible: false }));
         signOut();
@@ -95,35 +104,51 @@ const Settings = () => {
   const SectionHeader = ({ icon, title }: { icon: React.ReactNode; title: string }) => (
     <View className="flex-row items-center mb-4">
       {icon}
-      <Text className="text-lg font-JakartaBold text-slate-800 ml-2">{title}</Text>
+      <Text className={`text-lg font-JakartaBold ml-2 ${isDark ? "text-slate-100" : "text-slate-900"}`}>{title}</Text>
     </View>
   );
 
   return (
-    <SafeAreaView className="flex-1" style={{ backgroundColor: "#F7FAFF" }}>
+    <SafeAreaView className={`flex-1 ${isDark ? "bg-slate-900" : "bg-surface-light"}`}>
       <ScrollView className="px-5" contentContainerStyle={{ paddingBottom: 120, paddingTop: 10 }}>
-        <Text className="text-2xl font-JakartaBold my-5">Settings</Text>
+        <Text className={`text-2xl font-JakartaBold my-5 ${isDark ? "text-slate-100" : "text-slate-900"}`}>Settings</Text>
+
+        {/* ════════ APPEARANCE ════════ */}
+        <View className={`rounded-2xl shadow-sm border px-5 py-4 mb-4 ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200"}`}>
+          <SectionHeader
+            icon={<Ionicons name="moon" size={22} color={colors.accent[400]} />}
+            title="Appearance"
+          />
+          <View className="flex-row items-center justify-between py-3">
+            <Text className={`text-base font-JakartaMedium ${isDark ? "text-slate-300" : "text-slate-700"}`}>Dark mode</Text>
+            <Switch
+              value={colorScheme === "dark"}
+              onValueChange={handleDarkModeToggle}
+              trackColor={{ false: "#CBD5E1", true: colors.accent[400] }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
+        </View>
 
         {/* ════════ DEVICE SETTINGS ════════ */}
-        <View className="bg-white rounded-2xl shadow-sm shadow-neutral-300 px-5 py-4 mb-4">
-          <SectionHeader icon={<Ionicons name="hardware-chip" size={22} color="#5BB8E8" />} title="Device settings" />
+        <View className={`rounded-2xl shadow-sm border px-5 py-4 mb-4 ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200"}`}>
+          <SectionHeader icon={<Ionicons name="hardware-chip" size={22} color={colors.accent[400]} />} title="Device settings" />
 
           {devices.length === 0 ? (
-            <Text className="text-sm font-JakartaMedium text-slate-500">No devices found. Add a tracker to get started.</Text>
+            <Text className={`text-sm font-JakartaMedium ${isDark ? "text-slate-400" : "text-slate-500"}`}>No devices found. Add a tracker to get started.</Text>
           ) : (
             <>
               {devices.length > 1 && (
                 <View className="mb-4">
-                  <Text className="text-sm font-JakartaMedium text-gray-500 mb-2">Select device</Text>
+                  <Text className={`text-sm font-JakartaMedium mb-2 ${isDark ? "text-slate-400" : "text-slate-600"}`}>Select device</Text>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                     {devices.map((d) => (
                       <TouchableOpacity
                         key={d.id}
                         onPress={() => setSelectedDevice(d.id)}
-                        className="mr-3 px-4 py-2 rounded-xl"
-                        style={{ backgroundColor: deviceId === d.id ? "#5BB8E8" : "#E2E8F0" }}
+                        className={`mr-3 px-4 py-2 rounded-xl ${deviceId === d.id ? "bg-accent-400" : isDark ? "bg-slate-600" : "bg-slate-200"}`}
                       >
-                        <Text className="text-sm font-JakartaBold" style={{ color: deviceId === d.id ? "#fff" : "#475569" }}>
+                        <Text className={`text-sm font-JakartaBold ${deviceId === d.id ? "text-white" : isDark ? "text-slate-300" : "text-slate-600"}`}>
                           {d.name}
                         </Text>
                       </TouchableOpacity>
@@ -133,30 +158,30 @@ const Settings = () => {
               )}
 
               {currentDevice && (
-                <View className="border border-slate-200 rounded-xl p-3 mb-3">
+                <View className={`border rounded-xl p-3 mb-3 ${isDark ? "border-slate-600" : "border-slate-200"}`}>
                   <View className="flex-row justify-between mb-1">
-                    <Text className="text-sm font-JakartaMedium text-slate-500">Name</Text>
-                    <Text className="text-sm font-JakartaBold text-slate-700">{currentDevice.name}</Text>
+                    <Text className={`text-sm font-JakartaMedium ${isDark ? "text-slate-400" : "text-slate-500"}`}>Name</Text>
+                    <Text className={`text-sm font-JakartaBold ${isDark ? "text-slate-200" : "text-slate-700"}`}>{currentDevice.name}</Text>
                   </View>
                   {currentDevice.imei && (
                     <View className="flex-row justify-between mb-1">
-                      <Text className="text-sm font-JakartaMedium text-slate-500">IMEI</Text>
-                      <Text className="text-sm font-JakartaBold text-slate-700">{currentDevice.imei}</Text>
+                      <Text className={`text-sm font-JakartaMedium ${isDark ? "text-slate-400" : "text-slate-500"}`}>IMEI</Text>
+                      <Text className={`text-sm font-JakartaBold ${isDark ? "text-slate-200" : "text-slate-700"}`}>{currentDevice.imei}</Text>
                     </View>
                   )}
                   <View className="flex-row justify-between mb-1">
-                    <Text className="text-sm font-JakartaMedium text-slate-500">Status</Text>
+                    <Text className={`text-sm font-JakartaMedium ${isDark ? "text-slate-400" : "text-slate-500"}`}>Status</Text>
                     <View className="flex-row items-center">
-                      <View className="w-2 h-2 rounded-full mr-1" style={{ backgroundColor: currentDevice.status === "online" ? "#4CAF50" : "#9E9E9E" }} />
-                      <Text className="text-sm font-JakartaBold" style={{ color: currentDevice.status === "online" ? "#4CAF50" : "#9E9E9E" }}>
+                      <View className={`w-2 h-2 rounded-full mr-1 ${currentDevice.status === "online" ? "bg-status-success" : "bg-status-muted"}`} />
+                      <Text className={`text-sm font-JakartaBold ${currentDevice.status === "online" ? "text-status-success" : "text-status-muted"}`}>
                         {currentDevice.status}
                       </Text>
                     </View>
                   </View>
                   {currentDevice.battery_level != null && (
                     <View className="flex-row justify-between">
-                      <Text className="text-sm font-JakartaMedium text-slate-500">Battery</Text>
-                      <Text className="text-sm font-JakartaBold text-slate-700">{currentDevice.battery_level}%</Text>
+                      <Text className={`text-sm font-JakartaMedium ${isDark ? "text-slate-400" : "text-slate-500"}`}>Battery</Text>
+                      <Text className={`text-sm font-JakartaBold ${isDark ? "text-slate-200" : "text-slate-700"}`}>{currentDevice.battery_level}%</Text>
                     </View>
                   )}
                 </View>
@@ -165,37 +190,36 @@ const Settings = () => {
               <TouchableOpacity
                 onPress={fetchDiagnostics}
                 disabled={diagLoading}
-                className="flex-row items-center py-3 px-4 rounded-xl"
-                style={{ backgroundColor: "#EAF4FF", borderWidth: 1, borderColor: "#5BB8E8" }}
+                className={`flex-row items-center py-3 px-4 rounded-xl border ${isDark ? "bg-slate-700 border-slate-600" : "bg-accent-100 border-accent-400"}`}
               >
                 {diagLoading ? (
-                  <ActivityIndicator size="small" color="#5BB8E8" />
+                  <ActivityIndicator size="small" color={colors.accent[400]} />
                 ) : (
                   <>
-                    <Ionicons name="analytics" size={18} color="#5BB8E8" />
-                    <Text className="text-sm font-JakartaBold text-sky-700 ml-2">View diagnostics</Text>
+                    <Ionicons name="analytics" size={18} color={colors.accent[400]} />
+                    <Text className={`text-sm font-JakartaBold ml-2 ${isDark ? "text-sky-300" : "text-sky-700"}`}>View diagnostics</Text>
                   </>
                 )}
               </TouchableOpacity>
               {diagnostics && (
-                <View className="border border-slate-200 rounded-xl p-3 mt-2">
+                <View className={`border rounded-xl p-3 mt-2 ${isDark ? "border-slate-600" : "border-slate-200"}`}>
                   <View className="flex-row justify-between mb-1">
-                    <Text className="text-xs font-JakartaMedium text-slate-500">Sending status</Text>
-                    <Text className="text-xs font-JakartaBold text-slate-700">{diagnostics.sending_status}</Text>
+                    <Text className={`text-xs font-JakartaMedium ${isDark ? "text-slate-400" : "text-slate-500"}`}>Sending status</Text>
+                    <Text className={`text-xs font-JakartaBold ${isDark ? "text-slate-200" : "text-slate-700"}`}>{diagnostics.sending_status}</Text>
                   </View>
                   <View className="flex-row justify-between mb-1">
-                    <Text className="text-xs font-JakartaMedium text-slate-500">Since last update</Text>
-                    <Text className="text-xs font-JakartaBold text-slate-700">{diagnostics.seconds_since_last_update}s</Text>
+                    <Text className={`text-xs font-JakartaMedium ${isDark ? "text-slate-400" : "text-slate-500"}`}>Since last update</Text>
+                    <Text className={`text-xs font-JakartaBold ${isDark ? "text-slate-200" : "text-slate-700"}`}>{diagnostics.seconds_since_last_update}s</Text>
                   </View>
                   {diagnostics.location_intervals && (
                     <>
                       <View className="flex-row justify-between mb-1">
-                        <Text className="text-xs font-JakartaMedium text-slate-500">Avg interval</Text>
-                        <Text className="text-xs font-JakartaBold text-slate-700">{diagnostics.location_intervals.avg_seconds?.toFixed(0)}s</Text>
+                        <Text className={`text-xs font-JakartaMedium ${isDark ? "text-slate-400" : "text-slate-500"}`}>Avg interval</Text>
+                        <Text className={`text-xs font-JakartaBold ${isDark ? "text-slate-200" : "text-slate-700"}`}>{diagnostics.location_intervals.avg_seconds?.toFixed(0)}s</Text>
                       </View>
                       <View className="flex-row justify-between">
-                        <Text className="text-xs font-JakartaMedium text-slate-500">Last interval</Text>
-                        <Text className="text-xs font-JakartaBold text-slate-700">{diagnostics.location_intervals.last_interval_seconds?.toFixed(0)}s</Text>
+                        <Text className={`text-xs font-JakartaMedium ${isDark ? "text-slate-400" : "text-slate-500"}`}>Last interval</Text>
+                        <Text className={`text-xs font-JakartaBold ${isDark ? "text-slate-200" : "text-slate-700"}`}>{diagnostics.location_intervals.last_interval_seconds?.toFixed(0)}s</Text>
                       </View>
                     </>
                   )}
@@ -206,15 +230,15 @@ const Settings = () => {
         </View>
 
         {/* ════════ NOTIFICATION PREFERENCES ════════ */}
-        <View className="bg-white rounded-2xl shadow-sm shadow-neutral-300 px-5 py-4 mb-4">
-          <SectionHeader icon={<Ionicons name="volume-high" size={22} color="#F59E0B" />} title="Notification preferences" />
+        <View className={`rounded-2xl shadow-sm border px-5 py-4 mb-4 ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200"}`}>
+          <SectionHeader icon={<Ionicons name="volume-high" size={22} color={colors.status.warning} />} title="Notification preferences" />
           {Object.entries(notifSettings).map(([key, val]) => (
-            <View key={key} className="flex-row items-center justify-between py-3 border-b border-neutral-100">
-              <Text className="text-base font-JakartaMedium text-slate-700 capitalize">{key}</Text>
+            <View key={key} className={`flex-row items-center justify-between py-3 border-b ${isDark ? "border-slate-700" : "border-neutral-100"}`}>
+              <Text className={`text-base font-JakartaMedium capitalize ${isDark ? "text-slate-300" : "text-slate-700"}`}>{key}</Text>
               <Switch
                 value={val}
                 onValueChange={(v) => setNotifSettings((prev) => ({ ...prev, [key]: v }))}
-                trackColor={{ false: "#CBD5E1", true: "#5BB8E8" }}
+                trackColor={{ false: "#CBD5E1", true: colors.accent[400] }}
                 thumbColor="#FFFFFF"
               />
             </View>
@@ -222,24 +246,21 @@ const Settings = () => {
         </View>
 
         {/* ════════ ACCOUNT ════════ */}
-        <View className="bg-white rounded-2xl shadow-sm shadow-neutral-300 px-5 py-4 mb-4">
-          <SectionHeader icon={<Ionicons name="person-circle" size={22} color="#5BB8E8" />} title="Account" />
+        <View className={`rounded-2xl shadow-sm border px-5 py-4 mb-4 ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200"}`}>
+          <SectionHeader icon={<Ionicons name="person-circle" size={22} color={colors.accent[400]} />} title="Account" />
           <View className="flex-row items-center mb-4">
-            <View
-              className="w-14 h-14 rounded-full items-center justify-center mr-3"
-              style={{ backgroundColor: "#EAF4FF", borderWidth: 1, borderColor: "#5BB8E8" }}
-            >
+            <View className={`w-14 h-14 rounded-full items-center justify-center mr-3 border ${isDark ? "bg-slate-700 border-slate-600" : "bg-accent-100 border-accent-400"}`}>
               {user?.imageUrl ? (
                 <Image source={{ uri: user.imageUrl }} className="w-full h-full rounded-full" />
               ) : (
-                <Ionicons name="person" size={28} color="#5BB8E8" />
+                <Ionicons name="person" size={28} color={colors.accent[400]} />
               )}
             </View>
             <View className="flex-1">
-              <Text className="text-base font-JakartaBold text-slate-800">
+              <Text className={`text-base font-JakartaBold ${isDark ? "text-slate-200" : "text-slate-800"}`}>
                 {user?.fullName || user?.firstName || "User"}
               </Text>
-              <Text className="text-sm font-JakartaMedium text-slate-500">
+              <Text className={`text-sm font-JakartaMedium ${isDark ? "text-slate-400" : "text-slate-500"}`}>
                 {user?.primaryEmailAddress?.emailAddress || ""}
               </Text>
             </View>
@@ -247,34 +268,33 @@ const Settings = () => {
 
           <TouchableOpacity
             onPress={handleSignOut}
-            className="flex-row items-center justify-center py-3 rounded-xl"
-            style={{ backgroundColor: "#FEE2E2", borderWidth: 1, borderColor: "#FECACA" }}
+            className={`flex-row items-center justify-center py-3 rounded-xl border ${isDark ? "bg-danger-900/30 border-danger-800" : "bg-danger-100 border-danger-200"}`}
           >
-            <Ionicons name="log-out" size={18} color="#DC2626" />
-            <Text className="font-JakartaBold text-red-600 ml-2">Sign out</Text>
+            <Ionicons name="log-out" size={18} color={colors.status.error} />
+            <Text className={`font-JakartaBold ml-2 ${isDark ? "text-red-400" : "text-red-600"}`}>Sign out</Text>
           </TouchableOpacity>
         </View>
 
         {/* ════════ ABOUT ════════ */}
-        <View className="bg-white rounded-2xl shadow-sm shadow-neutral-300 px-5 py-4 mb-4">
-          <SectionHeader icon={<Ionicons name="information-circle" size={22} color="#94A3B8" />} title="About" />
-          <Text className="text-sm font-JakartaMedium text-slate-500">BYThron GPS Tracker v1.0.0</Text>
-          <Text className="text-xs font-JakartaMedium text-slate-400 mt-1">GPS tracking and fleet management</Text>
+        <View className={`rounded-2xl shadow-sm border px-5 py-4 mb-4 ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200"}`}>
+          <SectionHeader icon={<Ionicons name="information-circle" size={22} color={colors.status.muted} />} title="About" />
+          <Text className={`text-sm font-JakartaMedium ${isDark ? "text-slate-400" : "text-slate-500"}`}>BYThron GPS Tracker v1.0.0</Text>
+          <Text className={`text-xs font-JakartaMedium mt-1 ${isDark ? "text-slate-500" : "text-slate-400"}`}>GPS tracking and fleet management</Text>
         </View>
       </ScrollView>
 
       {/* Dialog */}
       <Modal visible={dialog.visible} transparent animationType="fade">
         <View className="flex-1 justify-center items-center px-6" style={{ backgroundColor: "rgba(0,0,0,0.45)" }}>
-          <View className="bg-white rounded-2xl w-full max-w-sm overflow-hidden">
+          <View className={`rounded-2xl w-full max-w-sm overflow-hidden ${isDark ? "bg-slate-800" : "bg-white"}`}>
             <View className="items-center pt-6 pb-4 px-5" style={{ backgroundColor: DIALOG_COLORS[dialog.type].bg }}>
-              <View className="w-16 h-16 rounded-full items-center justify-center mb-3" style={{ backgroundColor: "#fff" }}>
+              <View className={`w-16 h-16 rounded-full items-center justify-center mb-3 ${isDark ? "bg-slate-700" : "bg-white"}`}>
                 <Ionicons name={dialog.icon} size={40} color={DIALOG_COLORS[dialog.type].icon} />
               </View>
-              <Text className="text-lg font-JakartaBold text-slate-800 text-center">{dialog.title}</Text>
+              <Text className={`text-lg font-JakartaBold text-center ${isDark ? "text-slate-100" : "text-slate-800"}`}>{dialog.title}</Text>
             </View>
             <View className="px-5 pt-4 pb-5">
-              <Text className="text-sm font-JakartaMedium text-slate-600 text-center leading-5">{dialog.message}</Text>
+              <Text className={`text-sm font-JakartaMedium text-center leading-5 ${isDark ? "text-slate-300" : "text-slate-600"}`}>{dialog.message}</Text>
               <TouchableOpacity
                 onPress={() => setDialog((p) => ({ ...p, visible: false }))}
                 className="mt-5 py-3 rounded-xl items-center"
@@ -290,21 +310,21 @@ const Settings = () => {
       {/* Confirm modal */}
       <Modal visible={confirmModal.visible} transparent animationType="fade">
         <View className="flex-1 justify-center items-center px-6" style={{ backgroundColor: "rgba(0,0,0,0.45)" }}>
-          <View className="bg-white rounded-2xl w-full max-w-sm overflow-hidden">
-            <View className="items-center pt-6 pb-4 px-5" style={{ backgroundColor: "#FFFBEB" }}>
-              <View className="w-16 h-16 rounded-full items-center justify-center mb-3" style={{ backgroundColor: "#fff" }}>
+          <View className={`rounded-2xl w-full max-w-sm overflow-hidden ${isDark ? "bg-slate-800" : "bg-white"}`}>
+            <View className={`items-center pt-6 pb-4 px-5 ${isDark ? "bg-slate-700" : "bg-amber-50"}`}>
+              <View className={`w-16 h-16 rounded-full items-center justify-center mb-3 ${isDark ? "bg-slate-600" : "bg-white"}`}>
                 <Ionicons name={confirmModal.icon} size={40} color={confirmModal.iconColor} />
               </View>
-              <Text className="text-lg font-JakartaBold text-slate-800 text-center">{confirmModal.title}</Text>
+              <Text className={`text-lg font-JakartaBold text-center ${isDark ? "text-slate-100" : "text-slate-800"}`}>{confirmModal.title}</Text>
             </View>
             <View className="px-5 pt-4 pb-5">
-              <Text className="text-sm font-JakartaMedium text-slate-600 text-center leading-5">{confirmModal.message}</Text>
+              <Text className={`text-sm font-JakartaMedium text-center leading-5 ${isDark ? "text-slate-300" : "text-slate-600"}`}>{confirmModal.message}</Text>
               <View className="flex-row gap-3 mt-5">
                 <TouchableOpacity
                   onPress={() => setConfirmModal((p) => ({ ...p, visible: false }))}
-                  className="flex-1 py-3 rounded-xl items-center border border-slate-300"
+                  className={`flex-1 py-3 rounded-xl items-center border ${isDark ? "border-slate-600" : "border-slate-300"}`}
                 >
-                  <Text className="font-JakartaBold text-slate-600">Cancel</Text>
+                  <Text className={`font-JakartaBold ${isDark ? "text-slate-300" : "text-slate-600"}`}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={confirmModal.onConfirm}
