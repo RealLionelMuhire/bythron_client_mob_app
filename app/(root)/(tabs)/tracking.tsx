@@ -1,7 +1,24 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { View, Text, ActivityIndicator, StyleSheet, TouchableOpacity, Platform, Dimensions } from "react-native";
+import {
+  View,
+  Text,
+  ActivityIndicator,
+  StyleSheet,
+  TouchableOpacity,
+  Platform,
+  Dimensions,
+  Animated,
+  PanResponder,
+  LayoutAnimation,
+  UIManager,
+} from "react-native";
+
+if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 import Mapbox from "@rnmapbox/maps";
 import { useColorScheme } from "nativewind";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { getThemeColors } from "@/constants/theme";
 import { useDeviceStore, useLocationStore } from "@/store";
@@ -10,6 +27,7 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { startLocationPolling } from "@/lib/liveTracking";
 import { Speedometer } from "@/components/Speedometer";
 import { TrackingMarker } from "@/components/TrackingMarker";
+import { fetchAPI } from "@/lib/fetch";
 
 const normalizeBearing = (value: number) => ((value % 360) + 360) % 360;
 const interpolateBearing = (from: number, to: number, t: number) => {
@@ -22,6 +40,9 @@ const interpolateBearing = (from: number, to: number, t: number) => {
 };
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
+const PANEL_HEIGHT = SCREEN_HEIGHT * 0.30 - 6;
+const COLLAPSED_BAR_HEIGHT = 40;
+const TAB_BAR_HEIGHT = 80;
 
 const accessToken = process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN;
 if (accessToken) {
@@ -32,7 +53,9 @@ const Tracking = () => {
   const { colorScheme } = useColorScheme();
   const colors = getThemeColors(colorScheme === "dark" ? "dark" : "light");
   const styles = useMemo(() => createTrackingStyles(colors), [colors]);
+  const insets = useSafeAreaInsets();
   const devices = useDeviceStore((s) => s.devices);
+  const setDevices = useDeviceStore((s) => s.setDevices);
   const currentLocation = useDeviceStore((s) => s.currentLocation);
   const setCurrentLocation = useDeviceStore((s) => s.setCurrentLocation);
   const userLatitude = useLocationStore((s) => s.userLatitude);
@@ -46,6 +69,10 @@ const Tracking = () => {
   const [pitch, setPitch] = useState(45);
   const [streetName, setStreetName] = useState("Locating...");
   const [batteryLevel, setBatteryLevel] = useState<number | null>(null);
+  const [controlsExpanded, setControlsExpanded] = useState(false);
+  const [topPanelExpanded, setTopPanelExpanded] = useState(true);
+  const panelTranslateY = useRef(new Animated.Value(0)).current;
+  const topPanelExpandedRef = useRef(true);
 
   const device = selectedDevice || devices?.[0];
   const speed = currentLocation?.speed ?? device?.speed ?? 0;
@@ -69,6 +96,18 @@ const Tracking = () => {
   }, [devices, selectedDevice]);
 
   useEffect(() => {
+    const refreshDevices = async () => {
+      try {
+        const res = await fetchAPI("/api/devices/") as { data?: Device[] };
+        if (res?.data) setDevices(res.data);
+      } catch (e) {
+        console.error("Failed to refresh devices:", e);
+      }
+    };
+    refreshDevices();
+  }, [setDevices]);
+
+  useEffect(() => {
     if (!device?.id) return;
     const cleanup = startLocationPolling(device.id, (location) => {
       setCurrentLocation(location);
@@ -79,6 +118,63 @@ const Tracking = () => {
   useEffect(() => {
     setBatteryLevel(typeof device?.battery_level === "number" ? device.battery_level : null);
   }, [device?.battery_level, device?.id]);
+
+  const lastUpdated = currentLocation?.timestamp ?? device?.last_seen;
+
+  const snapTopPanel = (expanded: boolean) => {
+    topPanelExpandedRef.current = expanded;
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setTopPanelExpanded(expanded);
+    Animated.spring(panelTranslateY, {
+      toValue: expanded ? 0 : -(PANEL_HEIGHT - COLLAPSED_BAR_HEIGHT),
+      useNativeDriver: true,
+      damping: 20,
+      stiffness: 200,
+    }).start();
+  };
+
+  const topPanelPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderGrant: () => {
+          topPanelExpandedRef.current = topPanelExpanded;
+        },
+        onPanResponderMove: (_, g) => {
+          const maxDrag = PANEL_HEIGHT - COLLAPSED_BAR_HEIGHT;
+          const expanded = topPanelExpandedRef.current;
+          if (expanded && g.dy < 0) {
+            panelTranslateY.setValue(Math.max(-maxDrag, g.dy));
+          } else if (!expanded && g.dy > 0) {
+            panelTranslateY.setValue(Math.min(0, -maxDrag + g.dy));
+          }
+        },
+        onPanResponderRelease: (_, g) => {
+          const threshold = 40;
+          const velocity = g.vy;
+          const expanded = topPanelExpandedRef.current;
+          const isTap = Math.abs(g.dy) < 8 && Math.abs(velocity) < 0.2;
+          if (isTap && !expanded) {
+            snapTopPanel(true);
+            return;
+          }
+          if (expanded) {
+            if (g.dy < -threshold || velocity < -0.3) snapTopPanel(false);
+            else snapTopPanel(true);
+          } else {
+            if (g.dy > threshold || velocity > 0.3) snapTopPanel(true);
+            else snapTopPanel(false);
+          }
+        },
+      }),
+    [topPanelExpanded]
+  );
+
+  const toggleControlsExpanded = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setControlsExpanded((prev) => !prev);
+  };
 
   useEffect(() => {
     let isActive = true;
@@ -193,76 +289,109 @@ const Tracking = () => {
 
   return (
     <View className="flex-1 bg-surface-light dark:bg-slate-900">
-      {/* ═══ Top Info Section ═══ */}
-      <View style={[styles.topSection, { height: SCREEN_HEIGHT * 0.30 - 6 }]}>
-        <View style={styles.statusBarBg}>
-          <View style={styles.statusBadge}>
-            <View style={[styles.statusDot, { backgroundColor: device?.status === "online" ? colors.status.success : colors.status.muted }]} />
-            <Text style={styles.statusBadgeText}>{status}</Text>
-          </View>
-          <Text style={styles.deviceNameText} numberOfLines={1}>{device?.name || "Tracker"}</Text>
-        </View>
-
-        <View style={styles.infoContainer}>
-          {/* Left */}
-          <View style={styles.leftIcons}>
-            <View style={styles.iconButton}>
-              <Ionicons name={batteryIcon} size={20} color={batteryColor} />
-              <Text style={styles.iconLabel}>Battery</Text>
-              <Text style={[styles.iconStatus, { color: batteryColor }]}>
-                {batteryLevel != null ? `${batteryLevel}%` : "--"}
-              </Text>
+      {/* Top safe area spacer - keeps panel below notch/camera */}
+      <View style={{ height: insets.top, backgroundColor: colors.accent[200] }} />
+      {/* ═══ Swipeable Top Info Section ═══ - shrinks when collapsed so map expands */}
+      <View
+        style={[
+          styles.topSection,
+          { height: topPanelExpanded ? PANEL_HEIGHT : COLLAPSED_BAR_HEIGHT },
+        ]}
+        pointerEvents="box-none"
+      >
+        {/* Collapsible content (above the handle) */}
+        <Animated.View
+          style={[
+            styles.panelContent,
+            {
+              transform: [{ translateY: panelTranslateY }],
+            },
+          ]}
+        >
+          <View style={styles.statusBarBg}>
+            <View style={styles.statusBadge}>
+              <View style={[styles.statusDot, { backgroundColor: device?.status === "online" ? colors.status.success : colors.status.muted }]} />
+              <Text style={styles.statusBadgeText}>{status}</Text>
             </View>
-            <View style={styles.iconButton}>
-              <MaterialCommunityIcons name="key" size={20} color={colors.accent[400]} />
-              <Text style={styles.iconLabel}>Ignition</Text>
-              <Text style={styles.iconStatus}>
-                {device?.status === "online" ? "On" : "Off"}
-              </Text>
-            </View>
+            <Text style={styles.deviceNameText} numberOfLines={1}>{device?.name || "Tracker"}</Text>
           </View>
 
-          {/* Center */}
-          <View style={styles.speedometerContainer}>
-            <Speedometer speed={speed} maxSpeed={120} size="large" />
-            <Text style={styles.currentSpeed}>{speed.toFixed(0)} KM/H</Text>
-            <View style={styles.distanceRow}>
-              <MaterialCommunityIcons name="road-variant" size={16} color={colors.accent[400]} style={{ marginRight: 4 }} />
-              <Text style={styles.lastSeenText}>{formatTimeAgo(device?.last_seen)}</Text>
-            </View>
-          </View>
-
-          {/* Right */}
-          <View style={styles.rightInfo}>
-            <View style={styles.infoCard}>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoCardLabel}>{status}</Text>
-                <Ionicons name={device?.status === "online" ? "radio-button-on" : "radio-button-off"} size={14} color={device?.status === "online" ? colors.status.success : colors.status.muted} />
+          <View style={styles.infoContainer}>
+            <View style={styles.leftIcons}>
+              <View style={styles.iconButton}>
+                <Ionicons name={batteryIcon} size={20} color={batteryColor} />
+                <Text style={styles.iconLabel}>Battery</Text>
+                <Text style={[styles.iconStatus, { color: batteryColor }]}>
+                  {batteryLevel != null ? `${batteryLevel}%` : "--"}
+                </Text>
+              </View>
+              <View style={styles.iconButton}>
+                <MaterialCommunityIcons name="key" size={20} color={colors.accent[400]} />
+                <Text style={styles.iconLabel}>Ignition</Text>
+                <Text style={styles.iconStatus}>
+                  {device?.status === "online" ? "On" : "Off"}
+                </Text>
               </View>
             </View>
-            <View style={styles.infoCard}>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoCardLabel}>Updated</Text>
-                <Ionicons name="time-outline" size={14} color={colors.accent[400]} />
+
+            <View style={styles.speedometerContainer}>
+              <Speedometer speed={speed} maxSpeed={120} size="large" />
+              <Text style={styles.currentSpeed}>{speed.toFixed(0)} KM/H</Text>
+              <View style={styles.distanceRow}>
+                <MaterialCommunityIcons name="road-variant" size={16} color={colors.accent[400]} style={{ marginRight: 4 }} />
+                <Text style={styles.lastSeenText}>{formatTimeAgo(lastUpdated)}</Text>
               </View>
-              <Text style={styles.infoCardValue}>{formatTimeAgo(device?.last_seen)}</Text>
             </View>
-            {device?.speed != null && (
+
+            <View style={styles.rightInfo}>
               <View style={styles.infoCard}>
                 <View style={styles.infoRow}>
-                  <Text style={styles.infoCardLabel}>Speed</Text>
-                  <Ionicons name="speedometer-outline" size={14} color={colors.accent[400]} />
+                  <Text style={styles.infoCardLabel}>{status}</Text>
+                  <Ionicons name={device?.status === "online" ? "radio-button-on" : "radio-button-off"} size={14} color={device?.status === "online" ? colors.status.success : colors.status.muted} />
                 </View>
-                <Text style={styles.infoCardValue}>{speed.toFixed(0)} km/h</Text>
               </View>
-            )}
+              <View style={styles.infoCard}>
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoCardLabel}>Updated</Text>
+                  <Ionicons name="time-outline" size={14} color={colors.accent[400]} />
+                </View>
+                <Text style={styles.infoCardValue}>{formatTimeAgo(lastUpdated)}</Text>
+              </View>
+              {device?.speed != null && (
+                <View style={styles.infoCard}>
+                  <View style={styles.infoRow}>
+                    <Text style={styles.infoCardLabel}>Speed</Text>
+                    <Ionicons name="speedometer-outline" size={14} color={colors.accent[400]} />
+                  </View>
+                  <Text style={styles.infoCardValue}>{speed.toFixed(0)} km/h</Text>
+                </View>
+              )}
+            </View>
           </View>
-        </View>
 
-        {/* Address bar */}
-        <View style={styles.addressBar}>
-          <Ionicons name="location" size={16} color={colors.accent[400]} />
-          <Text style={styles.addressText} numberOfLines={1}>{streetName}</Text>
+          <View style={styles.addressBar}>
+            <Ionicons name="location" size={16} color={colors.accent[400]} />
+            <Text style={styles.addressText} numberOfLines={1}>{streetName}</Text>
+          </View>
+        </Animated.View>
+
+        {/* Pill handle + chevron at base of panel - swipeable */}
+        <View
+          {...topPanelPanResponder.panHandlers}
+          style={[styles.panelHandle, { backgroundColor: colors.accent[100] }]}
+        >
+          <View style={[styles.pill, { backgroundColor: colors.surface.border }]} />
+          <TouchableOpacity
+            onPress={() => snapTopPanel(!topPanelExpanded)}
+            style={styles.chevronBtn}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          >
+            <Ionicons
+              name={topPanelExpanded ? "chevron-up" : "chevron-down"}
+              size={20}
+              color={colors.text.secondary}
+            />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -294,17 +423,28 @@ const Tracking = () => {
           />
         </Mapbox.MapView>
 
-        {/* Left map controls */}
-        <View style={styles.mapControls}>
-          <TouchableOpacity onPress={handleToggleStyle} style={styles.mapControlBtn}>
-            <MaterialCommunityIcons name="layers" size={22} color={colors.accent[400]} />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={handleToggle3D} style={styles.mapControlBtn}>
-            <MaterialCommunityIcons name="cube-outline" size={22} color={colors.accent[400]} />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={handleRecenter} style={styles.mapControlBtn} accessibilityLabel="Recenter">
-            <Ionicons name="navigate-circle" size={22} color={colors.accent[400]} />
-          </TouchableOpacity>
+        {/* Bottom-right map controls (collapsible, single-hand friendly) */}
+        <View style={[styles.mapControls, { bottom: 16 + insets.bottom + TAB_BAR_HEIGHT }]}>
+          {controlsExpanded ? (
+            <>
+              <TouchableOpacity onPress={handleToggleStyle} style={styles.mapControlBtn}>
+                <MaterialCommunityIcons name="layers" size={22} color={colors.accent[400]} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleToggle3D} style={styles.mapControlBtn}>
+                <MaterialCommunityIcons name="cube-outline" size={22} color={colors.accent[400]} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleRecenter} style={styles.mapControlBtn} accessibilityLabel="Recenter">
+                <Ionicons name="navigate-circle" size={22} color={colors.accent[400]} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={toggleControlsExpanded} style={styles.mapControlBtn} accessibilityLabel="Collapse controls">
+                <Ionicons name="remove" size={22} color={colors.accent[400]} />
+              </TouchableOpacity>
+            </>
+          ) : (
+            <TouchableOpacity onPress={toggleControlsExpanded} style={styles.mapControlBtn} accessibilityLabel="Expand controls">
+              <Ionicons name="add" size={22} color={colors.accent[400]} />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     </View>
@@ -316,6 +456,26 @@ function createTrackingStyles(colors: ReturnType<typeof getThemeColors>) {
   topSection: {
     backgroundColor: colors.accent[200],
     paddingTop: 0,
+    overflow: "hidden",
+  },
+  panelHandle: {
+    height: COLLAPSED_BAR_HEIGHT,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingTop: 6,
+  },
+  pill: {
+    width: 40,
+    height: 5,
+    borderRadius: 3,
+    marginBottom: 4,
+  },
+  chevronBtn: {
+    padding: 4,
+  },
+  panelContent: {
+    flex: 1,
+    overflow: "hidden",
   },
   statusBarBg: {
     height: 44,
@@ -452,9 +612,9 @@ function createTrackingStyles(colors: ReturnType<typeof getThemeColors>) {
   },
   mapControls: {
     position: "absolute",
-    left: 16,
-    top: 16,
-    gap: 10,
+    right: 16,
+    zIndex: 1000,
+    elevation: 10,
   },
   mapControlBtn: {
     width: 44,
@@ -465,6 +625,7 @@ function createTrackingStyles(colors: ReturnType<typeof getThemeColors>) {
     borderColor: colors.surface.border,
     alignItems: "center",
     justifyContent: "center",
+    marginBottom: 10,
   },
 });
 }
