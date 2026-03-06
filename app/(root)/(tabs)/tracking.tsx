@@ -3,13 +3,23 @@ import { View, Text, ActivityIndicator, StyleSheet, TouchableOpacity, Platform, 
 import Mapbox from "@rnmapbox/maps";
 import { useColorScheme } from "nativewind";
 
-import { getThemeColors, theme } from "@/constants/theme";
+import { getThemeColors } from "@/constants/theme";
 import { useDeviceStore, useLocationStore } from "@/store";
 import { Device } from "@/types/type";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { startLocationPolling } from "@/lib/liveTracking";
 import { Speedometer } from "@/components/Speedometer";
-import { NavigationArrow } from "@/components/NavigationArrow";
+import { TrackingMarker } from "@/components/TrackingMarker";
+
+const normalizeBearing = (value: number) => ((value % 360) + 360) % 360;
+const interpolateBearing = (from: number, to: number, t: number) => {
+  const start = normalizeBearing(from);
+  const end = normalizeBearing(to);
+  let delta = end - start;
+  if (delta > 180) delta -= 360;
+  if (delta < -180) delta += 360;
+  return normalizeBearing(start + delta * t);
+};
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -29,6 +39,7 @@ const Tracking = () => {
   const userLongitude = useLocationStore((s) => s.userLongitude);
   const userAddress = useLocationStore((s) => s.userAddress);
   const cameraRef = useRef<Mapbox.Camera>(null);
+  const smoothedCourseRef = useRef<number | null>(null);
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [mapStyle, setMapStyle] = useState("mapbox://styles/mapbox/satellite-streets-v12");
   const [zoomLevel, setZoomLevel] = useState(14);
@@ -38,7 +49,15 @@ const Tracking = () => {
 
   const device = selectedDevice || devices?.[0];
   const speed = currentLocation?.speed ?? device?.speed ?? 0;
-  const course = currentLocation?.course ?? 0;
+  const rawCourse = currentLocation?.course ?? 0;
+
+  const displayCourse = useMemo(() => {
+    const target = typeof rawCourse === "number" ? rawCourse : 0;
+    const prev = smoothedCourseRef.current;
+    const next = prev == null ? target : interpolateBearing(prev, target, 0.15);
+    smoothedCourseRef.current = next;
+    return next;
+  }, [rawCourse]);
   const status = device?.status === "online" ? "Moving" : "Stopped";
   const targetLatitude = currentLocation?.latitude ?? userLatitude;
   const targetLongitude = currentLocation?.longitude ?? userLongitude;
@@ -266,30 +285,13 @@ const Tracking = () => {
             pitch={pitch}
           />
 
-          {/* Vehicle marker with direction arrow */}
-          <Mapbox.MarkerView
+          {/* Vehicle marker (shared with History - identical circle, arrow, transparency, 3D) */}
+          <TrackingMarker
             id="vehicle-marker"
             coordinate={[targetLongitude, targetLatitude]}
-            anchor={{ x: 0.5, y: 0.5 }}
-          >
-            <View
-              style={[
-                styles.vehicleMarker,
-                {
-                  shadowOffset: { width: 0, height: pitch > 0 ? 4 : 2 },
-                  shadowOpacity: pitch > 0 ? 0.35 : 0.2,
-                  shadowRadius: pitch > 0 ? 6 : 3,
-                  elevation: pitch > 0 ? 8 : 4,
-                  transform: [
-                    { rotate: `${course}deg` },
-                    ...(pitch > 0 ? [{ perspective: 1000 }, { rotateX: "25deg" as any }] : []),
-                  ],
-                },
-              ]}
-            >
-              <NavigationArrow size={27} color="#E36060" />
-            </View>
-          </Mapbox.MarkerView>
+            course={displayCourse}
+            pitch={pitch}
+          />
         </Mapbox.MapView>
 
         {/* Left map controls */}
@@ -447,17 +449,6 @@ function createTrackingStyles(colors: ReturnType<typeof getThemeColors>) {
   },
   map: {
     flex: 1,
-  },
-  vehicleMarker: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.surface.card,
-    borderWidth: 2,
-    borderColor: colors.surface.border,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
   },
   mapControls: {
     position: "absolute",

@@ -1,10 +1,12 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import ReactNative, {
   ActivityIndicator,
   Dimensions,
   Platform,
+  RefreshControl,
   ScrollView,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -19,10 +21,11 @@ import { useColorScheme } from "nativewind";
 
 import { getThemeColors, theme } from "@/constants/theme";
 import { fetchAPI } from "@/lib/fetch";
+import { fetchTrips, fetchTripDetail, startTrip, endTrip } from "@/lib/trips";
 import { useDeviceStore, useLocationStore } from "@/store";
-import { Device } from "@/types/type";
-import { NavigationArrow } from "@/components/NavigationArrow";
+import { Device, Trip } from "@/types/type";
 import { Speedometer } from "@/components/Speedometer";
+import { TrackingMarker } from "@/components/TrackingMarker";
 
 type RouteFeature = {
   type: "Feature";
@@ -137,6 +140,8 @@ const SPEEDOMETER_MAX = 120;
 // Set to 1 for km/h; use 3.6 if backend speeds are in m/s.
 const SPEED_DISPLAY_MULTIPLIER = 1;
 
+type HistoryMode = "trips" | "date";
+
 const History = () => {
   const { colorScheme } = useColorScheme();
   const colors = getThemeColors(colorScheme === "dark" ? "dark" : "light");
@@ -149,6 +154,17 @@ const History = () => {
   const setSelectedDevice = useDeviceStore((s) => s.setSelectedDevice);
   const setDevices = useDeviceStore((s) => s.setDevices);
   const setHistoryFullScreen = useDeviceStore((s) => s.setHistoryFullScreen);
+
+  const [mode, setMode] = useState<HistoryMode>("trips");
+  const [trips, setTrips] = useState<Trip[]>([]);
+  const [tripsLoading, setTripsLoading] = useState(false);
+  const [tripsRefreshing, setTripsRefreshing] = useState(false);
+  const [tripsError, setTripsError] = useState<string | null>(null);
+  const [loadedTripInfo, setLoadedTripInfo] = useState<{ device_name: string; display_name: string } | null>(null);
+  const [startTripLoading, setStartTripLoading] = useState(false);
+  const [endTripLoading, setEndTripLoading] = useState<number | null>(null);
+  const [showStartTripInput, setShowStartTripInput] = useState(false);
+  const [newTripName, setNewTripName] = useState("");
 
   const [date, setDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -171,7 +187,7 @@ const History = () => {
   const playbackPositionRef = useRef(0);
   const lastFrameTimeRef = useRef<number | null>(null);
 
-  const routeLoaded = !!(routeData || routeLine);
+  const routeLoaded = !!(routeData || routeLineData);
 
   useEffect(() => {
     if (devices.length > 0 || loading) return;
@@ -198,6 +214,141 @@ const History = () => {
     }
   }, [devices, selectedDevice, setSelectedDevice]);
 
+  const fetchTripsList = useCallback(async (isRefresh = false) => {
+    if (!selectedDevice) return;
+    if (isRefresh) setTripsRefreshing(true);
+    else setTripsLoading(true);
+    setTripsError(null);
+    try {
+      const data = await fetchTrips(selectedDevice);
+      setTrips(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Failed to fetch trips", err);
+      setTripsError("Failed to load saved trips");
+      setTrips([]);
+    } finally {
+      setTripsLoading(false);
+      setTripsRefreshing(false);
+    }
+  }, [selectedDevice]);
+
+  useEffect(() => {
+    if (mode === "trips" && selectedDevice) {
+      fetchTripsList();
+    }
+  }, [mode, selectedDevice, fetchTripsList]);
+
+  const handleLoadTrip = async (tripId: number) => {
+    if (!selectedDevice) {
+      setError("Please select a device");
+      return;
+    }
+    setLoading(true);
+    setTripsError(null);
+    setError(null);
+    try {
+      const detail = await fetchTripDetail(tripId, selectedDevice);
+      const r = detail.route;
+      if (!r?.coordinates?.length) {
+        setError("No route data yet (trip may still be in progress)");
+        setLoading(false);
+        return;
+      }
+      const coords = r.coordinates as [number, number][];
+      const timestamps = r.timestamps ?? [];
+      const speeds = r.speeds ?? [];
+      const courses = r.courses ?? [];
+
+      setRouteLineData({
+        type: "Feature",
+        geometry: { type: "LineString", coordinates: coords },
+        properties: r.properties ?? {},
+      });
+
+      const points: RouteFeature[] = coords.map((coord, idx) => ({
+        type: "Feature" as const,
+        geometry: { type: "Point" as const, coordinates: coord },
+        properties: {
+          timestamp: timestamps[idx] ?? null,
+          speed: toNumberOrNull(speeds[idx]) ?? 0,
+          course: toNumberOrNull(courses[idx]) ?? null,
+        },
+      }));
+
+      const withBearing = (features: RouteFeature[]) =>
+        features.map((feature, idx) => {
+          let course = toNumberOrNull(feature.properties?.course);
+          if ((course == null || !Number.isFinite(course)) && idx < features.length - 1) {
+            course = bearingDegrees(
+              feature.geometry.coordinates,
+              features[idx + 1].geometry.coordinates
+            );
+          }
+          return {
+            ...feature,
+            properties: { ...feature.properties, course: course ?? 0 },
+          };
+        });
+
+      setMovingPoints(withBearing(points));
+      setRouteData({
+        type: "FeatureCollection",
+        features: [],
+        properties: {
+          device_name: detail.device_name,
+          start_time: detail.start_time,
+          end_time: detail.end_time ?? undefined,
+        },
+      });
+      setLoadedTripInfo({
+        device_name: detail.device_name,
+        display_name: detail.display_name ?? detail.name,
+      });
+      setPlaybackPosition(0);
+      playbackPositionRef.current = 0;
+      setIsPlaying(false);
+      setControlsExpanded(false);
+    } catch (err) {
+      console.error("Failed to load trip", err);
+      setError("Failed to load trip");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleStartTrip = async () => {
+    if (!selectedDevice) return;
+    const name = newTripName.trim() || `Trip ${format(new Date(), "MMM d, h:mm")}`;
+    setStartTripLoading(true);
+    setTripsError(null);
+    try {
+      await startTrip(selectedDevice, name);
+      setShowStartTripInput(false);
+      setNewTripName("");
+      fetchTripsList(true);
+    } catch (err) {
+      console.error("Failed to start trip", err);
+      setTripsError("Failed to start trip");
+    } finally {
+      setStartTripLoading(false);
+    }
+  };
+
+  const handleEndTrip = async (tripId: number) => {
+    if (!selectedDevice) return;
+    setEndTripLoading(tripId);
+    setTripsError(null);
+    try {
+      await endTrip(tripId, selectedDevice);
+      fetchTripsList(true);
+    } catch (err) {
+      console.error("Failed to end trip", err);
+      setTripsError("Failed to end trip");
+    } finally {
+      setEndTripLoading(null);
+    }
+  };
+
   const handleLoadRoute = async () => {
     if (!selectedDevice) {
       setError("Please select a device");
@@ -206,6 +357,7 @@ const History = () => {
 
     setLoading(true);
     setError(null);
+    setLoadedTripInfo(null);
 
     try {
       const startTime = new Date(date);
@@ -255,9 +407,9 @@ const History = () => {
 
           routeLinePoints = coords
             .map((coord: [number, number], idx: number) => ({
-              type: "Feature",
+              type: "Feature" as const,
               geometry: {
-                type: "Point",
+                type: "Point" as const,
                 coordinates: coord,
               },
               properties: {
@@ -276,16 +428,16 @@ const History = () => {
         setRouteLineData(null);
       }
 
-      let historyFeatures = Array.isArray(historyResponse.value)
-        ? (historyResponse as any[])
-            .map((point) => ({
-              type: "Feature",
+      const historyValue = historyResponse.value;
+      let historyFeatures: RouteFeature[] = (Array.isArray(historyValue)
+        ? (historyValue as any[]).map((point) => ({
+              type: "Feature" as const,
               geometry: {
-                type: "Point",
+                type: "Point" as const,
                 coordinates: [
                   point.longitude ?? point.lon ?? point.lng,
                   point.latitude ?? point.lat,
-                ],
+                ] as [number, number],
               },
               properties: {
                 timestamp: point.timestamp ?? point.time,
@@ -293,10 +445,8 @@ const History = () => {
                 course: toNumberOrNull(point.course ?? point.heading) ?? null,
               },
             }))
-            .filter((feature) =>
-              feature.geometry.coordinates.every((value: any) => typeof value === "number")
-            )
-        : (historyResponse.value as RouteFeatureCollection)?.features ?? [];
+            .filter((f) => f.geometry.coordinates.every((v) => typeof v === "number"))
+        : (historyValue as RouteFeatureCollection)?.features ?? []) as RouteFeature[];
       
       // Calculate bearing between consecutive points if not provided
       const withBearing = (features: RouteFeature[]) =>
@@ -358,8 +508,12 @@ const History = () => {
   const centerCoordinate = useMemo<[number, number]>(() => {
     const firstPoint = routeData?.features?.[0]?.geometry?.coordinates;
     if (firstPoint) return firstPoint;
+    const firstLineCoord = routeLineData?.geometry?.coordinates?.[0];
+    if (firstLineCoord) return firstLineCoord;
+    const firstMoving = movingPoints[0]?.geometry?.coordinates;
+    if (firstMoving) return firstMoving;
     return [userLongitude || 0, userLatitude || 0];
-  }, [routeData, userLatitude, userLongitude]);
+  }, [routeData, routeLineData, movingPoints, userLatitude, userLongitude]);
 
   const playbackPoints = useMemo(() => {
     if (movingPoints.length) return movingPoints;
@@ -396,16 +550,16 @@ const History = () => {
       start[0] + (end[0] - start[0]) * t,
       start[1] + (end[1] - start[1]) * t,
     ];
-    const startCourse = toNumberOrNull(playbackPoints[index].properties?.course);
-    const endCourse = toNumberOrNull(playbackPoints[nextIndex].properties?.course);
+    const startCourse = toNumberOrNull((playbackPoints[index].properties as Record<string, unknown>)?.course);
+    const endCourse = toNumberOrNull((playbackPoints[nextIndex].properties as Record<string, unknown>)?.course);
     const fallbackCourse = bearingDegrees(start, end);
     const course =
       startCourse != null && endCourse != null
         ? interpolateBearing(startCourse, endCourse, t)
         : startCourse ?? endCourse ?? fallbackCourse;
 
-    const startSpeed = toNumberOrNull(playbackPoints[index].properties?.speed) ?? 0;
-    const endSpeed = toNumberOrNull(playbackPoints[nextIndex].properties?.speed) ?? 0;
+    const startSpeed = toNumberOrNull((playbackPoints[index].properties as Record<string, unknown>)?.speed) ?? 0;
+    const endSpeed = toNumberOrNull((playbackPoints[nextIndex].properties as Record<string, unknown>)?.speed) ?? 0;
     const speed = startSpeed + (endSpeed - startSpeed) * t;
 
     return {
@@ -529,18 +683,20 @@ const History = () => {
   }, [isPlaying, playbackPoints, playbackSpeed]);
 
   const deviceName = useMemo(() => {
+    if (loadedTripInfo?.display_name) return loadedTripInfo.display_name;
+    if (loadedTripInfo?.device_name) return loadedTripInfo.device_name;
     const current = devices.find((device) => device.id === selectedDevice);
     return routeData?.properties?.device_name || current?.name || "Device";
-  }, [devices, routeData, selectedDevice]);
+  }, [devices, routeData, selectedDevice, loadedTripInfo]);
 
   const routeSummary = useMemo(() => {
     if (!playbackPoints.length) return null;
-    const firstTs = playbackPoints[0].properties?.timestamp;
-    const lastTs = playbackPoints[playbackPoints.length - 1].properties?.timestamp;
+    const firstTs = (playbackPoints[0].properties as Record<string, unknown>)?.timestamp;
+    const lastTs = (playbackPoints[playbackPoints.length - 1].properties as Record<string, unknown>)?.timestamp;
     let durationSec = 0;
     let startLabel = "";
     let endLabel = "";
-    if (firstTs && lastTs) {
+    if (firstTs && lastTs && (typeof firstTs === "string" || typeof firstTs === "number") && (typeof lastTs === "string" || typeof lastTs === "number")) {
       const start = new Date(firstTs);
       const end = new Date(lastTs);
       durationSec = differenceInSeconds(end, start);
@@ -566,8 +722,8 @@ const History = () => {
   const currentPlaybackTimeLabel = useMemo(() => {
     if (!playbackPoints.length || !routeSummary) return "0:00";
     const index = Math.min(Math.floor(playbackPosition), playbackPoints.length - 1);
-    const ts = playbackPoints[index].properties?.timestamp;
-    if (!ts) return "0:00";
+    const ts = (playbackPoints[index].properties as Record<string, unknown>)?.timestamp;
+    if (!ts || (typeof ts !== "string" && typeof ts !== "number")) return "0:00";
     const t = new Date(ts);
     return format(t, "h:mm a");
   }, [playbackPoints, playbackPosition, routeSummary]);
@@ -592,6 +748,7 @@ const History = () => {
     playbackPositionRef.current = 0;
     setIsPlaying(false);
     setError(null);
+    setLoadedTripInfo(null);
     setControlsExpanded(true);
     setHistoryFullScreen(false);
   };
@@ -709,6 +866,186 @@ const History = () => {
             )}
           </View>
 
+          {/* Mode toggle */}
+          <View style={styles.modeToggleRow}>
+            <TouchableOpacity
+              onPress={() => setMode("trips")}
+              style={[styles.modeChip, mode === "trips" && styles.modeChipActive]}
+            >
+              <MaterialCommunityIcons name="map-marker-path" size={18} color={mode === "trips" ? "#fff" : colors.accent[400]} style={{ marginRight: 6 }} />
+              <Text style={[styles.modeChipText, mode === "trips" && styles.modeChipTextActive]}>
+                Saved trips
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setMode("date")}
+              style={[styles.modeChip, mode === "date" && styles.modeChipActive]}
+            >
+              <Ionicons name="calendar-outline" size={18} color={mode === "date" ? "#fff" : colors.accent[400]} style={{ marginRight: 6 }} />
+              <Text style={[styles.modeChipText, mode === "date" && styles.modeChipTextActive]}>
+                Load by date
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {mode === "trips" ? (
+            <View style={styles.tripsSection}>
+              <Text style={styles.label}>Device</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.deviceScroll}>
+                {devices.length === 0 ? (
+                  <Text style={styles.placeholderText}>No devices</Text>
+                ) : (
+                  devices.map((device) => {
+                    const isActive = device.id === selectedDevice;
+                    return (
+                      <TouchableOpacity
+                        key={device.id}
+                        onPress={() => setSelectedDevice(device.id)}
+                        style={[styles.deviceChip, isActive && styles.deviceChipActive]}
+                      >
+                        <Ionicons name="car-outline" size={16} color={isActive ? colors.surface.card : colors.accent[200]} style={{ marginRight: 6 }} />
+                        <Text style={[styles.deviceChipText, isActive && styles.deviceChipTextActive]}>
+                          {device.name}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })
+                )}
+              </ScrollView>
+              {selectedDevice && !showStartTripInput && (
+                <TouchableOpacity
+                  onPress={() => setShowStartTripInput(true)}
+                  disabled={startTripLoading}
+                  style={[styles.startTripButton, startTripLoading && styles.loadButtonDisabled]}
+                >
+                  {startTripLoading ? (
+                    <ActivityIndicator size="small" color="#fff" style={{ marginRight: 8 }} />
+                  ) : (
+                    <Ionicons name="play" size={18} color="#fff" style={{ marginRight: 8 }} />
+                  )}
+                  <Text style={styles.startTripButtonText}>Start trip</Text>
+                </TouchableOpacity>
+              )}
+              {showStartTripInput && selectedDevice && (
+                <View style={styles.startTripInputRow}>
+                  <TextInput
+                    style={[styles.startTripInput, { color: colors.text.primary, borderColor: colors.surface.border }]}
+                    placeholder="Trip name (optional)"
+                    placeholderTextColor={colors.status.muted}
+                    value={newTripName}
+                    onChangeText={setNewTripName}
+                    editable={!startTripLoading}
+                  />
+                  <TouchableOpacity
+                    onPress={handleStartTrip}
+                    disabled={startTripLoading}
+                    style={[styles.startTripConfirmBtn, startTripLoading && styles.loadButtonDisabled]}
+                  >
+                    <Text style={styles.startTripButtonText}>Start</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => { setShowStartTripInput(false); setNewTripName(""); }}
+                    disabled={startTripLoading}
+                    style={styles.startTripCancelBtn}
+                  >
+                    <Text style={[styles.startTripCancelText, { color: colors.text.secondary }]}>Cancel</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+              {tripsError && (
+                <View style={styles.errorCard}>
+                  <Ionicons name="warning-outline" size={20} color={colors.status.error} />
+                  <Text style={styles.errorText}>{tripsError}</Text>
+                  <TouchableOpacity onPress={() => fetchTripsList()} style={styles.retryButton}>
+                    <Text style={styles.retryButtonText}>Retry</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+              {!selectedDevice ? (
+                <View style={styles.tripsEmpty}>
+                  <Ionicons name="car-outline" size={40} color={colors.status.muted} />
+                  <Text style={styles.tripsEmptyTitle}>Select a device</Text>
+                  <Text style={styles.tripsEmptySubtitle}>
+                    Choose a device above to view and manage trips.
+                  </Text>
+                </View>
+              ) : (
+              <ScrollView
+                style={styles.tripsList}
+                contentContainerStyle={styles.tripsListContent}
+                refreshControl={
+                  <RefreshControl
+                    refreshing={tripsRefreshing}
+                    onRefresh={() => fetchTripsList(true)}
+                    tintColor={colors.accent[400]}
+                  />
+                }
+              >
+                {tripsLoading && !tripsRefreshing ? (
+                  <View style={styles.tripsLoading}>
+                    <ActivityIndicator size="small" color={colors.accent[400]} />
+                    <Text style={styles.tripsLoadingText}>Loading trips…</Text>
+                  </View>
+                ) : trips.length === 0 ? (
+                  <View style={styles.tripsEmpty}>
+                    <MaterialCommunityIcons name="map-marker-off-outline" size={40} color={colors.status.muted} />
+                    <Text style={styles.tripsEmptyTitle}>No trips yet</Text>
+                    <Text style={styles.tripsEmptySubtitle}>
+                      Tap "Start trip" to begin recording. Trips auto-end when the device stops for 5 minutes.
+                    </Text>
+                  </View>
+                ) : (
+                  trips.map((trip) => {
+                    const isActive = trip.end_time == null;
+                    return (
+                      <View key={trip.id} style={styles.tripCard}>
+                        <TouchableOpacity
+                          style={styles.tripCardTouchable}
+                          onPress={() => isActive ? null : handleLoadTrip(trip.id)}
+                          activeOpacity={isActive ? 1 : 0.7}
+                          disabled={isActive}
+                        >
+                          <View style={styles.tripCardHeader}>
+                            <MaterialCommunityIcons
+                              name={isActive ? "record-circle" : "map-marker-path"}
+                              size={20}
+                              color={isActive ? colors.status.error : colors.accent[400]}
+                            />
+                            <Text style={styles.tripCardTitle} numberOfLines={2}>
+                              {trip.display_name || trip.name}
+                            </Text>
+                          </View>
+                          <View style={styles.tripCardMeta}>
+                            <Text style={styles.tripCardMetaText}>
+                              {format(new Date(trip.start_time), "MMM d, h:mm a")}
+                              {isActive ? " · In progress" : ` → ${format(new Date(trip.end_time!), "h:mm a")}`}
+                            </Text>
+                            <Text style={styles.tripCardMetaText}>
+                              {(trip.total_distance_km ?? 0).toFixed(1)} km
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
+                        {isActive && (
+                          <TouchableOpacity
+                            style={styles.endTripButton}
+                            onPress={() => handleEndTrip(trip.id)}
+                            disabled={endTripLoading === trip.id}
+                          >
+                            {endTripLoading === trip.id ? (
+                              <ActivityIndicator size="small" color="#fff" />
+                            ) : (
+                              <Text style={styles.endTripButtonText}>End trip</Text>
+                            )}
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    );
+                  })
+                )}
+              </ScrollView>
+              )}
+            </View>
+          ) : (
           <View style={styles.controlsCard}>
             <Text style={styles.label}>Device</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.deviceScroll}>
@@ -793,6 +1130,7 @@ const History = () => {
               )}
             </TouchableOpacity>
           </View>
+          )}
         </>
       )}
 
@@ -849,38 +1187,12 @@ const History = () => {
             )}
 
             {animatedPoint && (
-              <Mapbox.MarkerView
+              <TrackingMarker
                 id="historyMovingMarker"
                 coordinate={animatedPoint.geometry.coordinates}
-                allowOverlap
-              >
-                <View
-                  style={{
-                    width: 30,
-                    height: 30,
-                    alignItems: "center",
-                    justifyContent: "center",
-                    borderWidth: 2,
-                    borderColor: "white",
-                    borderRadius: 15,
-                    backgroundColor: "rgba(255, 255, 255, 0.1)",
-                    shadowColor: "#000",
-                    shadowOffset: { width: 0, height: pitch > 0 ? 4 : 2 },
-                    shadowOpacity: pitch > 0 ? 0.35 : 0.2,
-                    shadowRadius: pitch > 0 ? 6 : 3,
-                    elevation: pitch > 0 ? 8 : 4,
-                    transform: [
-                      { rotate: `${displayCourse}deg` },
-                      ...(pitch > 0 ? [{ perspective: 1000 }, { rotateX: '25deg' }] : []),
-                    ],
-                  }}
-                >
-                  <NavigationArrow
-                    size={27}
-                    color="#E36060"
-                  />
-                </View>
-              </Mapbox.MarkerView>
+                course={displayCourse}
+                pitch={pitch}
+              />
             )}
           </Mapbox.MapView>
         )}
@@ -1116,6 +1428,95 @@ function createHistoryStyles(colors: ReturnType<typeof getThemeColors>) {
   headerSubtitle: { fontSize: 13, color: colors.text.secondary, marginTop: 2, fontFamily: "Jakarta-Medium" },
   doneButton: { paddingVertical: 8, paddingHorizontal: 14 },
   doneButtonText: { fontSize: 16, color: colors.accent[400], fontFamily: "Jakarta-SemiBold" },
+  modeToggleRow: {
+    flexDirection: "row",
+    gap: 10,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 8,
+  },
+  modeChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 22,
+    backgroundColor: colors.accent[100],
+  },
+  modeChipActive: { backgroundColor: colors.accent[400] },
+  modeChipText: { fontSize: 14, color: colors.text.secondary, fontFamily: "Jakarta-Medium" },
+  modeChipTextActive: { color: "#fff" },
+  tripsSection: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    paddingBottom: 16,
+    backgroundColor: colors.surface.card,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.surface.border,
+    maxHeight: 280,
+  },
+  tripsList: { maxHeight: 200 },
+  tripsListContent: { paddingBottom: 8, gap: 8 },
+  tripsLoading: { flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 24, gap: 10 },
+  tripsLoadingText: { fontSize: 14, color: colors.text.secondary, fontFamily: "Jakarta-Medium" },
+  tripsEmpty: {
+    alignItems: "center",
+    paddingVertical: 24,
+    paddingHorizontal: 16,
+  },
+  tripsEmptyTitle: { fontSize: 16, fontWeight: "600", color: colors.text.primary, marginTop: 12, fontFamily: "Jakarta-SemiBold" },
+  tripsEmptySubtitle: { fontSize: 13, color: colors.status.muted, textAlign: "center", marginTop: 6, lineHeight: 18, fontFamily: "Jakarta-Medium" },
+  tripCard: {
+    backgroundColor: colors.accent[100],
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.surface.border,
+    overflow: "hidden",
+  },
+  tripCardTouchable: { padding: 14 },
+  tripCardHeader: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
+  tripCardTitle: { flex: 1, fontSize: 15, fontWeight: "600", color: colors.text.primary, fontFamily: "Jakarta-SemiBold" },
+  tripCardMeta: { flexDirection: "row", justifyContent: "space-between", marginTop: 8 },
+  tripCardMetaText: { fontSize: 12, color: colors.status.muted, fontFamily: "Jakarta-Medium" },
+  startTripButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.accent[400],
+    paddingVertical: 10,
+    borderRadius: 10,
+    marginTop: 12,
+  },
+  startTripButtonText: { color: "#fff", fontSize: 15, fontFamily: "Jakarta-SemiBold" },
+  startTripInputRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 12 },
+  startTripInput: {
+    flex: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    fontSize: 14,
+    fontFamily: "Jakarta-Medium",
+  },
+  startTripConfirmBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    backgroundColor: colors.accent[400],
+  },
+  startTripCancelBtn: { paddingVertical: 10, paddingHorizontal: 12 },
+  startTripCancelText: { fontSize: 14, fontFamily: "Jakarta-Medium" },
+  endTripButton: {
+    backgroundColor: colors.status.error,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    marginHorizontal: 14,
+    marginBottom: 12,
+    borderRadius: 10,
+  },
+  endTripButtonText: { color: "#fff", fontSize: 14, fontFamily: "Jakarta-SemiBold" },
   controlsCard: {
     paddingHorizontal: 20,
     paddingVertical: 16,

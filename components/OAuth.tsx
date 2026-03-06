@@ -1,12 +1,16 @@
 import { useOAuth } from "@clerk/clerk-expo";
 import { router } from "expo-router";
-import { Alert, Image, Text, View } from "react-native";
+import { Alert, Image, StyleSheet, Text, View } from "react-native";
+import { useColorScheme } from "nativewind";
 
 import CustomButton from "@/components/CustomButton";
+import { getThemeColors } from "@/constants/theme";
 import { icons } from "@/constants";
 import { googleOAuth } from "@/lib/auth";
 
 const OAuth = () => {
+  const { colorScheme } = useColorScheme();
+  const colors = getThemeColors(colorScheme === "dark" ? "dark" : "light");
   const { startOAuthFlow } = useOAuth({ strategy: "oauth_google" });
 
   const handleGoogleSignIn = async () => {
@@ -28,10 +32,10 @@ const OAuth = () => {
 
   return (
     <View>
-      <View className="flex flex-row justify-center items-center mt-4 gap-x-3">
-        <View className="flex-1 h-[1px] bg-general-100" />
-        <Text className="text-lg">Or</Text>
-        <View className="flex-1 h-[1px] bg-general-100" />
+      <View style={styles.dividerRow}>
+        <View style={[styles.divider, { backgroundColor: colors.surface.border }]} />
+        <Text style={[styles.dividerText, { color: colors.text.muted }]}>Or</Text>
+        <View style={[styles.divider, { backgroundColor: colors.surface.border }]} />
       </View>
 
       <CustomButton
@@ -51,5 +55,23 @@ const OAuth = () => {
     </View>
   );
 };
+
+const styles = StyleSheet.create({
+  dividerRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 16,
+    gap: 12,
+  },
+  divider: {
+    flex: 1,
+    height: 1,
+  },
+  dividerText: {
+    fontSize: 18,
+    fontFamily: "Jakarta-Medium",
+  },
+});
 
 export default OAuth;

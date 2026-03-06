@@ -59,6 +59,38 @@ declare interface HistoricalRoute {
   route: RouteData;
 }
 
+declare interface Trip {
+  id: number;
+  device_id: number;
+  user_id: number;
+  name: string;
+  display_name: string | null;
+  start_time: string;
+  end_time: string | null;  // null = active trip (in progress)
+  total_distance_km: number;
+  created_at: string;
+}
+
+declare interface TripDetail extends Trip {
+  device_name: string;
+  device_imei: string;
+  route?: {
+    type: "LineString";
+    coordinates: [number, number][];
+    timestamps: string[];
+    speeds: number[];
+    courses: number[];
+    properties: {
+      device_id: number;
+      device_name: string;
+      device_imei: string;
+      start_time: string;
+      end_time: string | null;
+      point_count: number;
+    };
+  };
+}
+
 declare interface ButtonProps extends TouchableOpacityProps {
   title: string;
   bgVariant?: "primary" | "secondary" | "danger" | "outline" | "success";
