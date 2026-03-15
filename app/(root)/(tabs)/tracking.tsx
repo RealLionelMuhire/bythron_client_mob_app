@@ -8,6 +8,7 @@ import {
   Platform,
   Dimensions,
   Animated,
+  Easing,
   PanResponder,
   LayoutAnimation,
   UIManager,
@@ -125,11 +126,12 @@ const Tracking = () => {
     topPanelExpandedRef.current = expanded;
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setTopPanelExpanded(expanded);
-    Animated.spring(panelTranslateY, {
-      toValue: expanded ? 0 : -(PANEL_HEIGHT - COLLAPSED_BAR_HEIGHT),
+    const toValue = expanded ? 0 : -(PANEL_HEIGHT - COLLAPSED_BAR_HEIGHT);
+    Animated.timing(panelTranslateY, {
+      toValue,
+      duration: 320,
       useNativeDriver: true,
-      damping: 20,
-      stiffness: 200,
+      easing: Easing.bezier(0.25, 0.1, 0.25, 1),
     }).start();
   };
 
