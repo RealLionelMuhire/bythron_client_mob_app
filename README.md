@@ -89,8 +89,8 @@ bun start
 ├── components/
 │   ├── Map.tsx             # Mapbox map component
 │   ├── DeviceCard.tsx      # Device list item
-│   └── HistorySheet.tsx    # Historical route picker
 ├── lib/
+│   ├── routeUtils.ts       # Route geometry & playback utilities
 │   └── liveTracking.ts     # Location polling utilities
 ├── store/
 │   └── index.ts            # Zustand state management

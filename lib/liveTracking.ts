@@ -35,37 +35,3 @@ export const startLocationPolling = (
     // Return cleanup function
     return () => clearInterval(interval);
 };
-
-/**
- * Fetch historical route data for a device
- * @param deviceId - The ID of the device
- * @param startTime - ISO 8601 start time
- * @param endTime - ISO 8601 end time
- * @returns RouteData GeoJSON FeatureCollection
- */
-export const fetchHistoricalRoute = async (
-    deviceId: number,
-    startTime: string,
-    endTime: string
-) => {
-    try {
-        const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
-        if (!baseUrl) {
-            throw new Error("API base URL not configured");
-        }
-
-        const response = await fetch(
-            `${baseUrl}/api/locations/${deviceId}/route?start_time=${encodeURIComponent(startTime)}&end_time=${encodeURIComponent(endTime)}`
-        );
-
-        if (!response.ok) {
-            throw new Error(`Failed to fetch route: ${response.status}`);
-        }
-
-        const data = await response.json();
-        return data;
-    } catch (error) {
-        console.error("Error fetching historical route:", error);
-        throw error;
-    }
-};

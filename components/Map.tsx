@@ -17,8 +17,6 @@ const MapComponent = () => {
   const devices = useDeviceStore((s) => s.devices);
   const selectedDevice = useDeviceStore((s) => s.selectedDevice);
   const currentLocation = useDeviceStore((s) => s.currentLocation);
-  const historicalRoute = useDeviceStore((s) => s.historicalRoute);
-
   const cameraRef = useRef<Mapbox.Camera>(null);
   const [deviceMarkers, setDeviceMarkers] = useState<MarkerData[]>([]);
 
@@ -143,24 +141,6 @@ const MapComponent = () => {
             </View>
           </Mapbox.PointAnnotation>
         ))}
-
-        {/* Historical Route */}
-        {historicalRoute && historicalRoute.route && (
-          <Mapbox.ShapeSource
-            id="routeSource"
-            shape={historicalRoute.route as any}
-          >
-            <Mapbox.LineLayer
-              id="routeLine"
-              style={{
-                lineColor: '#00ff00',
-                lineWidth: 3,
-                lineCap: 'round',
-                lineJoin: 'round',
-              }}
-            />
-          </Mapbox.ShapeSource>
-        )}
       </Mapbox.MapView>
     </View>
   );

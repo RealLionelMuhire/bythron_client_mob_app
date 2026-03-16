@@ -40,25 +40,6 @@ declare interface MapProps {
   onMapReady?: () => void;
 }
 
-declare interface RouteData {
-  type: 'FeatureCollection';
-  features: {
-    type: 'Feature';
-    geometry: {
-      type: 'LineString';
-      coordinates: number[][];
-    };
-    properties: any;
-  }[];
-}
-
-declare interface HistoricalRoute {
-  device_id: number;
-  start_time: string;
-  end_time: string;
-  route: RouteData;
-}
-
 declare interface Trip {
   id: number;
   device_id: number;
@@ -146,14 +127,12 @@ declare interface DeviceStore {
   devices: Device[];
   selectedDevice: number | null;
   currentLocation: Location | null;
-  historicalRoute: HistoricalRoute | null;
   isLoadingLocation: boolean;
   historyFullScreen: boolean;
   setSelectedDevice: (deviceId: number) => void;
   setDevices: (devices: Device[]) => void;
   clearSelectedDevice: () => void;
   setCurrentLocation: (location: Location) => void;
-  setHistoricalRoute: (route: HistoricalRoute | null) => void;
   setLoadingLocation: (loading: boolean) => void;
   setHistoryFullScreen: (v: boolean) => void;
 }

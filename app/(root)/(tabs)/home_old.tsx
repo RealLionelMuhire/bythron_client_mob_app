@@ -9,14 +9,11 @@ import {
   Image,
   FlatList,
   ActivityIndicator,
-  ScrollView,
-  Dimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import Map from "@/components/Map";
 import DeviceCard from "@/components/DeviceCard";
-import HistorySheet from "@/components/HistorySheet";
 import SimpleBottomSheet, { BottomSheetView } from "@/components/SimpleBottomSheet";
 import { icons } from "@/constants";
 import { useFetch } from "@/lib/fetch";
@@ -40,8 +37,6 @@ const Home = () => {
   } = useDeviceStore();
 
   const [activeTab, setActiveTab] = useState<TabType>("devices");
-  const [selectedHistoryDate, setSelectedHistoryDate] = useState<Date | null>(null);
-  const [showHistory, setShowHistory] = useState(false);
   const bottomSheetRef = useRef<any>(null);
 
   // Sync user to backend on load
@@ -141,13 +136,7 @@ const Home = () => {
           index={0}
         >
           <BottomSheetView style={{ flex: 1, padding: 20 }}>
-            {showHistory && selectedDevice ? (
-              <HistorySheet
-                deviceId={selectedDevice}
-                onClose={() => setShowHistory(false)}
-              />
-            ) : (
-              <>
+            <>
                 <View className="flex flex-row items-center justify-between mb-5">
                   <Text className="text-xl font-JakartaBold">
                     Your Devices {devices?.length ? `(${devices.length})` : ""}
@@ -169,7 +158,7 @@ const Home = () => {
                         setSelected={() => handleDeviceSelect(item.id)}
                         onHistoryPress={() => {
                           handleDeviceSelect(item.id);
-                          setShowHistory(true);
+                          router.push("/(root)/(tabs)/history");
                         }}
                       />
                     )}
@@ -185,7 +174,6 @@ const Home = () => {
                   />
                 )}
               </>
-            )}
           </BottomSheetView>
         </SimpleBottomSheet>
       </View>

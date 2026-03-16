@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-import { DeviceStore, LocationStore, Device, Location, HistoricalRoute } from "@/types/type";
+import { DeviceStore, LocationStore, Device, Location } from "@/types/type";
 
 export const useLocationStore = create<LocationStore>((set) => ({
   userLatitude: null,
@@ -54,7 +54,6 @@ export const useDeviceStore = create<DeviceStore>((set) => ({
   devices: [] as Device[],
   selectedDevice: null,
   currentLocation: null,
-  historicalRoute: null,
   isLoadingLocation: false,
   historyFullScreen: false,
   setSelectedDevice: (deviceId: number) =>
@@ -62,7 +61,6 @@ export const useDeviceStore = create<DeviceStore>((set) => ({
   setDevices: (devices: Device[]) => set(() => ({ devices })),
   clearSelectedDevice: () => set(() => ({ selectedDevice: null })),
   setCurrentLocation: (location: Location) => set(() => ({ currentLocation: location })),
-  setHistoricalRoute: (route: HistoricalRoute | null) => set(() => ({ historicalRoute: route })),
   setLoadingLocation: (loading: boolean) => set(() => ({ isLoadingLocation: loading })),
   setHistoryFullScreen: (v: boolean) => set(() => ({ historyFullScreen: v })),
 }));
