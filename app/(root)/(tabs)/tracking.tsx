@@ -12,6 +12,8 @@ import {
   PanResponder,
   LayoutAnimation,
   UIManager,
+  Modal,
+  Pressable,
 } from "react-native";
 
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -44,6 +46,7 @@ const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 const PANEL_HEIGHT = SCREEN_HEIGHT * 0.30 - 6;
 const COLLAPSED_BAR_HEIGHT = 40;
 const TAB_BAR_HEIGHT = 80;
+const PANEL_DRAG_RANGE = PANEL_HEIGHT - COLLAPSED_BAR_HEIGHT;
 
 const accessToken = process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN;
 if (accessToken) {
@@ -72,8 +75,10 @@ const Tracking = () => {
   const [batteryLevel, setBatteryLevel] = useState<number | null>(null);
   const [controlsExpanded, setControlsExpanded] = useState(false);
   const [topPanelExpanded, setTopPanelExpanded] = useState(true);
+  const [devicePickerVisible, setDevicePickerVisible] = useState(false);
   const panelTranslateY = useRef(new Animated.Value(0)).current;
   const topPanelExpandedRef = useRef(true);
+  const [chevronExpanded, setChevronExpanded] = useState(true);
 
   const device = selectedDevice || devices?.[0];
   const speed = currentLocation?.speed ?? device?.speed ?? 0;
@@ -124,13 +129,13 @@ const Tracking = () => {
 
   const snapTopPanel = (expanded: boolean) => {
     topPanelExpandedRef.current = expanded;
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setTopPanelExpanded(expanded);
-    const toValue = expanded ? 0 : -(PANEL_HEIGHT - COLLAPSED_BAR_HEIGHT);
+    setChevronExpanded(expanded);
+    const toValue = expanded ? 0 : -PANEL_DRAG_RANGE;
     Animated.timing(panelTranslateY, {
       toValue,
       duration: 320,
-      useNativeDriver: true,
+      useNativeDriver: false,
       easing: Easing.bezier(0.25, 0.1, 0.25, 1),
     }).start();
   };
@@ -138,18 +143,23 @@ const Tracking = () => {
   const topPanelPanResponder = useMemo(
     () =>
       PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: () => true,
+        // Don't claim on touch start — lets taps reach chevron & device switcher
+        onStartShouldSetPanResponder: () => false,
+        // Only claim when user actually drags vertically (avoids stealing taps)
+        onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 8,
         onPanResponderGrant: () => {
           topPanelExpandedRef.current = topPanelExpanded;
         },
         onPanResponderMove: (_, g) => {
-          const maxDrag = PANEL_HEIGHT - COLLAPSED_BAR_HEIGHT;
           const expanded = topPanelExpandedRef.current;
           if (expanded && g.dy < 0) {
-            panelTranslateY.setValue(Math.max(-maxDrag, g.dy));
+            const val = Math.max(-PANEL_DRAG_RANGE, g.dy);
+            panelTranslateY.setValue(val);
+            setChevronExpanded(val > -PANEL_DRAG_RANGE / 2);
           } else if (!expanded && g.dy > 0) {
-            panelTranslateY.setValue(Math.min(0, -maxDrag + g.dy));
+            const val = Math.min(0, -PANEL_DRAG_RANGE + g.dy);
+            panelTranslateY.setValue(val);
+            setChevronExpanded(val > -PANEL_DRAG_RANGE / 2);
           }
         },
         onPanResponderRelease: (_, g) => {
@@ -293,14 +303,22 @@ const Tracking = () => {
     <View className="flex-1 bg-surface-light dark:bg-slate-900">
       {/* Top safe area spacer - keeps panel below notch/camera */}
       <View style={{ height: insets.top, backgroundColor: colors.accent[200] }} />
-      {/* ═══ Swipeable Top Info Section ═══ - shrinks when collapsed so map expands */}
-      <View
+      {/* ═══ Swipeable Top Info Section ═══ - height follows swipe so wrapper wraps content */}
+      <Animated.View
         style={[
           styles.topSection,
-          { height: topPanelExpanded ? PANEL_HEIGHT : COLLAPSED_BAR_HEIGHT },
+          {
+            height: panelTranslateY.interpolate({
+              inputRange: [-PANEL_DRAG_RANGE, 0],
+              outputRange: [COLLAPSED_BAR_HEIGHT, PANEL_HEIGHT],
+              extrapolate: "clamp",
+            }),
+          },
         ]}
         pointerEvents="box-none"
       >
+        {/* Wrapper: entire panel is swipeable (handle + content), not just the handle */}
+        <View style={styles.panelSwipeArea} {...topPanelPanResponder.panHandlers}>
         {/* Collapsible content (above the handle) */}
         <Animated.View
           style={[
@@ -315,7 +333,20 @@ const Tracking = () => {
               <View style={[styles.statusDot, { backgroundColor: device?.status === "online" ? colors.status.success : colors.status.muted }]} />
               <Text style={styles.statusBadgeText}>{status}</Text>
             </View>
-            <Text style={styles.deviceNameText} numberOfLines={1}>{device?.name || "Tracker"}</Text>
+            {devices && devices.length > 1 ? (
+              <TouchableOpacity
+                onPress={() => setDevicePickerVisible(true)}
+                style={styles.deviceSwitcher}
+                activeOpacity={0.7}
+                accessibilityLabel="Switch device"
+                accessibilityRole="button"
+              >
+                <Text style={styles.deviceNameText} numberOfLines={1}>{device?.name || "Tracker"}</Text>
+                <Ionicons name="chevron-down" size={16} color={colors.text.secondary} />
+              </TouchableOpacity>
+            ) : (
+              <Text style={styles.deviceNameText} numberOfLines={1}>{device?.name || "Tracker"}</Text>
+            )}
           </View>
 
           <View style={styles.infoContainer}>
@@ -337,10 +368,10 @@ const Tracking = () => {
             </View>
 
             <View style={styles.speedometerContainer}>
-              <Speedometer speed={speed} maxSpeed={120} size="large" />
+              <Speedometer speed={speed} maxSpeed={160} size="large" />
               <Text style={styles.currentSpeed}>{speed.toFixed(0)} KM/H</Text>
               <View style={styles.distanceRow}>
-                <MaterialCommunityIcons name="road-variant" size={16} color={colors.accent[400]} style={{ marginRight: 4 }} />
+                <Ionicons name="time-outline" size={16} color={colors.accent[400]} style={{ marginRight: 4 }} />
                 <Text style={styles.lastSeenText}>{formatTimeAgo(lastUpdated)}</Text>
               </View>
             </View>
@@ -359,15 +390,6 @@ const Tracking = () => {
                 </View>
                 <Text style={styles.infoCardValue}>{formatTimeAgo(lastUpdated)}</Text>
               </View>
-              {device?.speed != null && (
-                <View style={styles.infoCard}>
-                  <View style={styles.infoRow}>
-                    <Text style={styles.infoCardLabel}>Speed</Text>
-                    <Ionicons name="speedometer-outline" size={14} color={colors.accent[400]} />
-                  </View>
-                  <Text style={styles.infoCardValue}>{speed.toFixed(0)} km/h</Text>
-                </View>
-              )}
             </View>
           </View>
 
@@ -377,9 +399,8 @@ const Tracking = () => {
           </View>
         </Animated.View>
 
-        {/* Pill handle + chevron at base of panel - swipeable */}
+        {/* Pill handle + chevron at base of panel */}
         <View
-          {...topPanelPanResponder.panHandlers}
           style={[styles.panelHandle, { backgroundColor: colors.accent[100] }]}
         >
           <View style={[styles.pill, { backgroundColor: colors.surface.border }]} />
@@ -387,15 +408,17 @@ const Tracking = () => {
             onPress={() => snapTopPanel(!topPanelExpanded)}
             style={styles.chevronBtn}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            accessibilityLabel={topPanelExpanded ? "Collapse panel" : "Expand panel"}
           >
             <Ionicons
-              name={topPanelExpanded ? "chevron-up" : "chevron-down"}
+              name={chevronExpanded ? "chevron-up" : "chevron-down"}
               size={20}
               color={colors.text.secondary}
             />
           </TouchableOpacity>
         </View>
-      </View>
+        </View>
+      </Animated.View>
 
       {/* ═══ Map Section ═══ */}
       <View style={{ flex: 1, position: "relative" }}>
@@ -429,10 +452,10 @@ const Tracking = () => {
         <View style={[styles.mapControls, { bottom: 16 + insets.bottom + TAB_BAR_HEIGHT }]}>
           {controlsExpanded ? (
             <>
-              <TouchableOpacity onPress={handleToggleStyle} style={styles.mapControlBtn}>
+              <TouchableOpacity onPress={handleToggleStyle} style={styles.mapControlBtn} accessibilityLabel="Toggle map style">
                 <MaterialCommunityIcons name="layers" size={22} color={colors.accent[400]} />
               </TouchableOpacity>
-              <TouchableOpacity onPress={handleToggle3D} style={styles.mapControlBtn}>
+              <TouchableOpacity onPress={handleToggle3D} style={styles.mapControlBtn} accessibilityLabel="Toggle 3D view">
                 <MaterialCommunityIcons name="cube-outline" size={22} color={colors.accent[400]} />
               </TouchableOpacity>
               <TouchableOpacity onPress={handleRecenter} style={styles.mapControlBtn} accessibilityLabel="Recenter">
@@ -449,6 +472,42 @@ const Tracking = () => {
           )}
         </View>
       </View>
+
+      {/* Device picker modal (when multiple devices) */}
+      {devices && devices.length > 1 && (
+        <Modal
+          visible={devicePickerVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setDevicePickerVisible(false)}
+        >
+          <Pressable
+            style={styles.modalOverlay}
+            onPress={() => setDevicePickerVisible(false)}
+          >
+            <View style={[styles.devicePickerSheet, { backgroundColor: colors.surface.card, borderColor: colors.surface.border }]}>
+              <Text style={[styles.devicePickerTitle, { color: colors.text.primary }]}>Select device</Text>
+              {devices.map((d) => (
+                <Pressable
+                  key={d.id}
+                  onPress={() => {
+                    setSelectedDevice(d);
+                    setDevicePickerVisible(false);
+                  }}
+                  style={({ pressed }) => [
+                    styles.devicePickerItem,
+                    { backgroundColor: pressed ? colors.accent[100] : "transparent", borderColor: colors.surface.border },
+                    device?.id === d.id && { backgroundColor: colors.accent[100] },
+                  ]}
+                >
+                  <Text style={[styles.devicePickerItemText, { color: colors.text.primary }]} numberOfLines={1}>{d.name}</Text>
+                  {device?.id === d.id && <Ionicons name="checkmark" size={20} color={colors.accent[400]} />}
+                </Pressable>
+              ))}
+            </View>
+          </Pressable>
+        </Modal>
+      )}
     </View>
   );
 };
@@ -459,6 +518,9 @@ function createTrackingStyles(colors: ReturnType<typeof getThemeColors>) {
     backgroundColor: colors.accent[200],
     paddingTop: 0,
     overflow: "hidden",
+  },
+  panelSwipeArea: {
+    flex: 1,
   },
   panelHandle: {
     height: COLLAPSED_BAR_HEIGHT,
@@ -507,11 +569,50 @@ function createTrackingStyles(colors: ReturnType<typeof getThemeColors>) {
     fontSize: 11,
     fontWeight: "600",
   },
+  deviceSwitcher: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    maxWidth: 180,
+  },
   deviceNameText: {
     color: colors.text.primary,
     fontSize: 13,
     fontWeight: "700",
     maxWidth: 160,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+    paddingHorizontal: 16,
+    paddingBottom: 40,
+  },
+  devicePickerSheet: {
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+  },
+  devicePickerTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    marginBottom: 12,
+    textAlign: "center",
+  },
+  devicePickerItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    marginBottom: 4,
+    borderWidth: 1,
+  },
+  devicePickerItemText: {
+    fontSize: 15,
+    fontWeight: "600",
+    flex: 1,
   },
   infoContainer: {
     flexDirection: "row",
