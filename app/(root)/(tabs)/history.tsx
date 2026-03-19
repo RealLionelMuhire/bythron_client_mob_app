@@ -35,6 +35,7 @@ import {
 import { fetchTrips, fetchTripDetail, startTrip, endTrip } from "@/lib/trips";
 import { useDeviceStore, useLocationStore } from "@/store";
 import { Device, Trip } from "@/types/type";
+import { MapScaleBar } from "@/components/MapScaleBar";
 import { Speedometer } from "@/components/Speedometer";
 import { TrackingMarker } from "@/components/TrackingMarker";
 
@@ -1026,6 +1027,7 @@ const History = () => {
             <Text style={styles.emptySubtitle}>Choose a device and date, then tap "Load route" to see playback</Text>
           </View>
         ) : (
+          <>
           <Mapbox.MapView
             style={styles.map}
             styleURL={mapStyle}
@@ -1067,6 +1069,20 @@ const History = () => {
               />
             )}
           </Mapbox.MapView>
+          </>
+        )}
+
+        {routeLoaded && (
+          <MapScaleBar
+            zoomLevel={13}
+            latitude={centerCoordinate[1]}
+            style={{
+              position: "absolute",
+              left: 16,
+              bottom: controlsExpanded ? 160 : 24,
+              zIndex: 100,
+            }}
+          />
         )}
 
         {routeLoaded && controlsExpanded && (

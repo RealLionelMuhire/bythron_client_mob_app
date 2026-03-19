@@ -28,6 +28,7 @@ import { useDeviceStore, useLocationStore } from "@/store";
 import { Device } from "@/types/type";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { startLocationPolling } from "@/lib/liveTracking";
+import { MapScaleBar } from "@/components/MapScaleBar";
 import { Speedometer } from "@/components/Speedometer";
 import { TrackingMarker } from "@/components/TrackingMarker";
 import { fetchAPI } from "@/lib/fetch";
@@ -69,7 +70,8 @@ const Tracking = () => {
   const smoothedCourseRef = useRef<number | null>(null);
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [mapStyle, setMapStyle] = useState("mapbox://styles/mapbox/satellite-streets-v12");
-  const [zoomLevel, setZoomLevel] = useState(14);
+  const INITIAL_ZOOM = 12; // Wider initial view for real-time tracking
+  const [zoomLevel, setZoomLevel] = useState(INITIAL_ZOOM);
   const [pitch, setPitch] = useState(45);
   const [streetName, setStreetName] = useState("Locating...");
   const [batteryLevel, setBatteryLevel] = useState<number | null>(null);
@@ -429,6 +431,7 @@ const Tracking = () => {
           scrollEnabled
           pitchEnabled
           rotateEnabled
+          scaleBarEnabled={false}
         >
           <Mapbox.Camera
             ref={cameraRef}
@@ -447,6 +450,13 @@ const Tracking = () => {
             pitch={pitch}
           />
         </Mapbox.MapView>
+
+        {/* Scale bar (meters) - bottom-left */}
+        <MapScaleBar
+          zoomLevel={zoomLevel}
+          latitude={targetLatitude}
+          style={[styles.scaleBar, { left: 16, bottom: 16 + insets.bottom + TAB_BAR_HEIGHT }]}
+        />
 
         {/* Bottom-right map controls (collapsible, single-hand friendly) */}
         <View style={[styles.mapControls, { bottom: 16 + insets.bottom + TAB_BAR_HEIGHT }]}>
@@ -712,6 +722,11 @@ function createTrackingStyles(colors: ReturnType<typeof getThemeColors>) {
   },
   map: {
     flex: 1,
+  },
+  scaleBar: {
+    position: "absolute",
+    zIndex: 999,
+    elevation: 9,
   },
   mapControls: {
     position: "absolute",
