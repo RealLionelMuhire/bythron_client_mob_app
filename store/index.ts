@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-import { DeviceStore, LocationStore, Device, Location } from "@/types/type";
+import { DeviceStore, LocationStore, UserStore, Device, Location, UserData } from "@/types/type";
 
 export const useLocationStore = create<LocationStore>((set) => ({
   userLatitude: null,
@@ -63,4 +63,9 @@ export const useDeviceStore = create<DeviceStore>((set) => ({
   setCurrentLocation: (location: Location) => set(() => ({ currentLocation: location })),
   setLoadingLocation: (loading: boolean) => set(() => ({ isLoadingLocation: loading })),
   setHistoryFullScreen: (v: boolean) => set(() => ({ historyFullScreen: v })),
+}));
+
+export const useUserStore = create<UserStore>((set) => ({
+  userData: null,
+  setUserData: (data: UserData) => set(() => ({ userData: data })),
 }));

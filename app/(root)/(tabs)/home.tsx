@@ -59,6 +59,8 @@ const Home = () => {
     };
   }, [devices]);
 
+  const setUserData = useUserStore((s) => s.setUserData);
+
   // Sync user to backend on load
   useEffect(() => {
     if (user) {
@@ -74,11 +76,17 @@ const Home = () => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          clerk_user_id: user.id,
+          userId: user.id,
           email: user.primaryEmailAddress?.emailAddress,
           name: safeName,
         }),
-      }).catch((err) => console.error("Auth sync failed", err));
+      })
+        .then((data) => {
+          if (data) {
+            setUserData(data);
+          }
+        })
+        .catch((err) => console.error("Auth sync failed", err));
     }
   }, [user]);
 

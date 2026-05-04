@@ -32,9 +32,8 @@ import {
   type RouteFeatureCollection,
   type RouteLineFeature,
 } from "@/lib/routeUtils";
-import { fetchTrips, fetchTripDetail, startTrip, endTrip } from "@/lib/trips";
 import { useDeviceStore, useLocationStore } from "@/store";
-import { Device, Trip } from "@/types/type";
+import { Device } from "@/types/type";
 import { MapScaleBar } from "@/components/MapScaleBar";
 import { Speedometer } from "@/components/Speedometer";
 import { TrackingMarker } from "@/components/TrackingMarker";
@@ -48,8 +47,6 @@ const SPEEDOMETER_MAX = 120;
 // Set to 1 for km/h; use 3.6 if backend speeds are in m/s.
 const SPEED_DISPLAY_MULTIPLIER = 1;
 
-type HistoryMode = "trips" | "date";
-
 const History = () => {
   const { colorScheme } = useColorScheme();
   const colors = getThemeColors(colorScheme === "dark" ? "dark" : "light");
@@ -61,18 +58,6 @@ const History = () => {
   const selectedDevice = useDeviceStore((s) => s.selectedDevice);
   const setSelectedDevice = useDeviceStore((s) => s.setSelectedDevice);
   const setDevices = useDeviceStore((s) => s.setDevices);
-  const setHistoryFullScreen = useDeviceStore((s) => s.setHistoryFullScreen);
-
-  const [mode, setMode] = useState<HistoryMode>("trips");
-  const [trips, setTrips] = useState<Trip[]>([]);
-  const [tripsLoading, setTripsLoading] = useState(false);
-  const [tripsRefreshing, setTripsRefreshing] = useState(false);
-  const [tripsError, setTripsError] = useState<string | null>(null);
-  const [loadedTripInfo, setLoadedTripInfo] = useState<{ device_name: string; display_name: string } | null>(null);
-  const [startTripLoading, setStartTripLoading] = useState(false);
-  const [endTripLoading, setEndTripLoading] = useState<number | null>(null);
-  const [showStartTripInput, setShowStartTripInput] = useState(false);
-  const [newTripName, setNewTripName] = useState("");
 
   const [date, setDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -90,7 +75,6 @@ const History = () => {
   const [isScrubbing, setIsScrubbing] = useState(false);
   const [isScrubbingSpeed, setIsScrubbingSpeed] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
-  const [controlsExpanded, setControlsExpanded] = useState(true);
   const smoothedCourseRef = useRef<number | null>(null);
   const playbackPositionRef = useRef(0);
   const lastFrameTimeRef = useRef<number | null>(null);
@@ -122,126 +106,6 @@ const History = () => {
     }
   }, [devices, selectedDevice, setSelectedDevice]);
 
-  const fetchTripsList = useCallback(async (isRefresh = false) => {
-    if (!selectedDevice) return;
-    if (isRefresh) setTripsRefreshing(true);
-    else setTripsLoading(true);
-    setTripsError(null);
-    try {
-      const data = await fetchTrips(selectedDevice);
-      setTrips(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error("Failed to fetch trips", err);
-      setTripsError("Failed to load saved trips");
-      setTrips([]);
-    } finally {
-      setTripsLoading(false);
-      setTripsRefreshing(false);
-    }
-  }, [selectedDevice]);
-
-  useEffect(() => {
-    if (mode === "trips" && selectedDevice) {
-      fetchTripsList();
-    }
-  }, [mode, selectedDevice, fetchTripsList]);
-
-  const handleLoadTrip = async (tripId: number) => {
-    if (!selectedDevice) {
-      setError("Please select a device");
-      return;
-    }
-    setLoading(true);
-    setTripsError(null);
-    setError(null);
-    try {
-      const detail = await fetchTripDetail(tripId, selectedDevice);
-      const r = detail.route;
-      if (!r?.coordinates?.length) {
-        setError("No route data yet (trip may still be in progress)");
-        setLoading(false);
-        return;
-      }
-      const coords = r.coordinates as [number, number][];
-      const timestamps = r.timestamps ?? [];
-      const speeds = r.speeds ?? [];
-      const courses = r.courses ?? [];
-
-      setRouteLineData({
-        type: "Feature",
-        geometry: { type: "LineString", coordinates: coords },
-        properties: r.properties ?? {},
-      });
-
-      const points: RouteFeature[] = coords.map((coord, idx) => ({
-        type: "Feature" as const,
-        geometry: { type: "Point" as const, coordinates: coord },
-        properties: {
-          timestamp: timestamps[idx] ?? null,
-          speed: toNumberOrNull(speeds[idx]) ?? 0,
-          course: toNumberOrNull(courses[idx]) ?? null,
-        },
-      }));
-
-      setMovingPoints(addBearingToFeatures(points));
-      setRouteData({
-        type: "FeatureCollection",
-        features: [],
-        properties: {
-          device_name: detail.device_name,
-          start_time: detail.start_time,
-          end_time: detail.end_time ?? undefined,
-        },
-      });
-      setLoadedTripInfo({
-        device_name: detail.device_name,
-        display_name: detail.display_name ?? detail.name,
-      });
-      setPlaybackPosition(0);
-      playbackPositionRef.current = 0;
-      setIsPlaying(false);
-      setControlsExpanded(false);
-    } catch (err) {
-      console.error("Failed to load trip", err);
-      setError("Failed to load trip");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleStartTrip = async () => {
-    if (!selectedDevice) return;
-    const name = newTripName.trim() || `Trip ${format(new Date(), "MMM d, h:mm")}`;
-    setStartTripLoading(true);
-    setTripsError(null);
-    try {
-      await startTrip(selectedDevice, name);
-      setShowStartTripInput(false);
-      setNewTripName("");
-      fetchTripsList(true);
-    } catch (err) {
-      console.error("Failed to start trip", err);
-      setTripsError("Failed to start trip");
-    } finally {
-      setStartTripLoading(false);
-    }
-  };
-
-  const handleEndTrip = async (tripId: number) => {
-    if (!selectedDevice) return;
-    setEndTripLoading(tripId);
-    setTripsError(null);
-    try {
-      await endTrip(tripId, selectedDevice);
-      fetchTripsList(true);
-    } catch (err) {
-      console.error("Failed to end trip", err);
-      setTripsError("Failed to end trip");
-    } finally {
-      setEndTripLoading(null);
-    }
-  };
-
   const handleLoadRoute = async () => {
     if (!selectedDevice) {
       setError("Please select a device");
@@ -250,7 +114,6 @@ const History = () => {
 
     setLoading(true);
     setError(null);
-    setLoadedTripInfo(null);
 
     try {
       const startTime = new Date(date);
@@ -349,7 +212,6 @@ const History = () => {
       setPlaybackPosition(0);
       playbackPositionRef.current = 0;
       setIsPlaying(false);
-      setControlsExpanded(false);
     } catch (err) {
       console.error("Failed to load route", err);
       setRouteData(null);
@@ -556,11 +418,9 @@ const History = () => {
   }, [isPlaying, playbackPoints, playbackSpeed]);
 
   const deviceName = useMemo(() => {
-    if (loadedTripInfo?.display_name) return loadedTripInfo.display_name;
-    if (loadedTripInfo?.device_name) return loadedTripInfo.device_name;
     const current = devices.find((device) => device.id === selectedDevice);
     return routeData?.properties?.device_name || current?.name || "Device";
-  }, [devices, routeData, selectedDevice, loadedTripInfo]);
+  }, [devices, routeData, selectedDevice]);
 
   const routeSummary = useMemo(() => {
     if (!playbackPoints.length) return null;
@@ -613,25 +473,6 @@ const History = () => {
     setPitch((prev) => (prev > 0 ? 0 : 60));
   };
 
-  const handleChangeRoute = () => {
-    setRouteData(null);
-    setRouteLineData(null);
-    setMovingPoints([]);
-    setPlaybackPosition(0);
-    playbackPositionRef.current = 0;
-    setIsPlaying(false);
-    setError(null);
-    setLoadedTripInfo(null);
-    setControlsExpanded(true);
-    setHistoryFullScreen(false);
-  };
-
-  useEffect(() => {
-    const fullScreen = routeLoaded && !controlsExpanded;
-    setHistoryFullScreen(fullScreen);
-    return () => setHistoryFullScreen(false);
-  }, [routeLoaded, controlsExpanded, setHistoryFullScreen]);
-
   if (Platform.OS === "web") {
     return (
       <View className="flex-1 items-center justify-center p-5 bg-surface-light">
@@ -658,361 +499,95 @@ const History = () => {
   }, [date]);
   const dateLabel = isToday ? "Today" : isYesterday ? "Yesterday" : format(date, "EEE, MMM d");
 
-  const showFullControls = !routeLoaded || controlsExpanded;
-
   return (
     <View style={styles.screen}>
-      {/* Live Tracking–style top section when route loaded and controls collapsed */}
-      {routeLoaded && !controlsExpanded && (
-        <View style={[styles.trackingTopSection, { height: SCREEN_HEIGHT * 0.30 - 6 }]}>
-          <View style={styles.trackingStatusBarBg} />
-          <View style={styles.trackingInfoContainer}>
-            <View style={styles.trackingLeftIcons}>
-              <View style={styles.trackingIconButton}>
-                <Ionicons name="time-outline" size={20} color={colors.accent[400]} />
-                <Text style={styles.trackingIconLabel}>Speed</Text>
-                <Text style={styles.trackingIconStatus}>{playbackSpeed.toFixed(1)}×</Text>
-              </View>
-              <View style={styles.trackingIconButton}>
-                <MaterialCommunityIcons name="map-marker-path" size={20} color={colors.accent[400]} />
-                <Text style={styles.trackingIconLabel}>Playback</Text>
-                <Text style={styles.trackingIconStatus}>{isPlaying ? "On" : "Off"}</Text>
-              </View>
-            </View>
-            <View style={styles.trackingSpeedometerContainer}>
-              <Speedometer speed={displaySpeed} maxSpeed={SPEEDOMETER_MAX} size="large" />
-              <Text style={styles.trackingCurrentSpeed}>{displaySpeed.toFixed(0)} KM/H</Text>
-              <View style={styles.trackingDistanceRow}>
-                <MaterialCommunityIcons name="road-variant" size={18} color={colors.accent[400]} style={styles.trackingDistanceIcon} />
-                <Text style={styles.trackingTotalDistance}>
-                  {routeSummary ? `${routeSummary.distanceKm.toFixed(1)} km` : "— km"}
-                </Text>
-              </View>
-            </View>
-            <View style={styles.trackingRightInfo}>
-              <View style={styles.trackingStatusCard}>
-                <View style={styles.trackingStatusHeader}>
-                  <Text style={styles.trackingStatusText}>{isPlaying ? "Playing" : "Paused"}</Text>
-                  <Ionicons name={isPlaying ? "play" : "pause"} size={18} color={colors.accent[400]} />
-                </View>
-                <Text style={styles.trackingStatusLabel}>M</Text>
-              </View>
-              <View style={styles.trackingInfoCard}>
-                <View style={styles.trackingInfoRow}>
-                  <Text style={styles.trackingInfoDate}>{format(date, "dd-MM-yy")}</Text>
-                  <Ionicons name="calendar-outline" size={16} color={colors.accent[400]} />
-                </View>
-                <Text style={styles.trackingInfoLabel}>Time</Text>
-                <Text style={styles.trackingInfoTime}>
-                  {routeSummary ? `${currentPlaybackTimeLabel} → ${routeSummary.endLabel}` : "—"}
-                </Text>
-              </View>
-            </View>
-          </View>
-          <TouchableOpacity
-            style={styles.trackingAddressBar}
-            onPress={handleChangeRoute}
-            activeOpacity={0.9}
-          >
-            <Ionicons name="location" size={18} color={colors.accent[400]} />
-            <MaterialCommunityIcons name="road-variant" size={16} color={colors.accent[400]} />
-            <Text style={styles.trackingAddressText} numberOfLines={1}>
-              {deviceName} · {dateLabel} · Tap to change route
-            </Text>
-            <Ionicons name="chevron-down" size={18} color={colors.accent[400]} />
-          </TouchableOpacity>
+      <View style={styles.header}>
+        <View style={styles.headerTextWrap}>
+          <Text style={styles.headerTitle}>Route History</Text>
+          <Text style={styles.headerSubtitle}>Select a device and date to view route</Text>
         </View>
-      )}
+      </View>
 
-      {/* Full header + controls: when no route or when expanded */}
-      {showFullControls && (
-        <>
-          <View style={[styles.header, routeLoaded && styles.headerWithDone]}>
-            <View style={styles.headerTextWrap}>
-              <Text style={styles.headerTitle}>Route History</Text>
-              <Text style={styles.headerSubtitle}>Play back past routes by device and date</Text>
-            </View>
-            {routeLoaded && (
-              <TouchableOpacity style={styles.doneButton} onPress={() => setControlsExpanded(false)}>
-                <Text style={styles.doneButtonText}>Done</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* Mode toggle */}
-          <View style={styles.modeToggleRow}>
-            <TouchableOpacity
-              onPress={() => setMode("trips")}
-              style={[styles.modeChip, mode === "trips" && styles.modeChipActive]}
-            >
-              <MaterialCommunityIcons name="map-marker-path" size={18} color={mode === "trips" ? "#fff" : colors.accent[400]} style={{ marginRight: 6 }} />
-              <Text style={[styles.modeChipText, mode === "trips" && styles.modeChipTextActive]}>
-                Saved trips
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => setMode("date")}
-              style={[styles.modeChip, mode === "date" && styles.modeChipActive]}
-            >
-              <Ionicons name="calendar-outline" size={18} color={mode === "date" ? "#fff" : colors.accent[400]} style={{ marginRight: 6 }} />
-              <Text style={[styles.modeChipText, mode === "date" && styles.modeChipTextActive]}>
-                Load by date
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {mode === "trips" ? (
-            <View style={styles.tripsSection}>
-              <Text style={styles.label}>Device</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.deviceScroll}>
-                {devices.length === 0 ? (
-                  <Text style={styles.placeholderText}>No devices</Text>
-                ) : (
-                  devices.map((device) => {
-                    const isActive = device.id === selectedDevice;
-                    return (
-                      <TouchableOpacity
-                        key={device.id}
-                        onPress={() => setSelectedDevice(device.id)}
-                        style={[styles.deviceChip, isActive && styles.deviceChipActive]}
-                      >
-                        <Ionicons name="car-outline" size={16} color={isActive ? colors.surface.card : colors.accent[200]} style={{ marginRight: 6 }} />
-                        <Text style={[styles.deviceChipText, isActive && styles.deviceChipTextActive]}>
-                          {device.name}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })
-                )}
-              </ScrollView>
-              {selectedDevice && !showStartTripInput && (
-                <TouchableOpacity
-                  onPress={() => setShowStartTripInput(true)}
-                  disabled={startTripLoading}
-                  style={[styles.startTripButton, startTripLoading && styles.loadButtonDisabled]}
-                >
-                  {startTripLoading ? (
-                    <ActivityIndicator size="small" color="#fff" style={{ marginRight: 8 }} />
-                  ) : (
-                    <Ionicons name="play" size={18} color="#fff" style={{ marginRight: 8 }} />
-                  )}
-                  <Text style={styles.startTripButtonText}>Start trip</Text>
-                </TouchableOpacity>
-              )}
-              {showStartTripInput && selectedDevice && (
-                <View style={styles.startTripInputRow}>
-                  <TextInput
-                    style={[styles.startTripInput, { color: colors.text.primary, borderColor: colors.surface.border }]}
-                    placeholder="Trip name (optional)"
-                    placeholderTextColor={colors.status.muted}
-                    value={newTripName}
-                    onChangeText={setNewTripName}
-                    editable={!startTripLoading}
-                  />
-                  <TouchableOpacity
-                    onPress={handleStartTrip}
-                    disabled={startTripLoading}
-                    style={[styles.startTripConfirmBtn, startTripLoading && styles.loadButtonDisabled]}
-                  >
-                    <Text style={styles.startTripButtonText}>Start</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => { setShowStartTripInput(false); setNewTripName(""); }}
-                    disabled={startTripLoading}
-                    style={styles.startTripCancelBtn}
-                  >
-                    <Text style={[styles.startTripCancelText, { color: colors.text.secondary }]}>Cancel</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-              {tripsError && (
-                <View style={styles.errorCard}>
-                  <Ionicons name="warning-outline" size={20} color={colors.status.error} />
-                  <Text style={styles.errorText}>{tripsError}</Text>
-                  <TouchableOpacity onPress={() => fetchTripsList()} style={styles.retryButton}>
-                    <Text style={styles.retryButtonText}>Retry</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-              {!selectedDevice ? (
-                <View style={styles.tripsEmpty}>
-                  <Ionicons name="car-outline" size={40} color={colors.status.muted} />
-                  <Text style={styles.tripsEmptyTitle}>Select a device</Text>
-                  <Text style={styles.tripsEmptySubtitle}>
-                    Choose a device above to view and manage trips.
-                  </Text>
-                </View>
-              ) : (
-              <ScrollView
-                style={styles.tripsList}
-                contentContainerStyle={styles.tripsListContent}
-                refreshControl={
-                  <RefreshControl
-                    refreshing={tripsRefreshing}
-                    onRefresh={() => fetchTripsList(true)}
-                    tintColor={colors.accent[400]}
-                  />
-                }
-              >
-                {tripsLoading && !tripsRefreshing ? (
-                  <View style={styles.tripsLoading}>
-                    <ActivityIndicator size="small" color={colors.accent[400]} />
-                    <Text style={styles.tripsLoadingText}>Loading trips…</Text>
-                  </View>
-                ) : trips.length === 0 ? (
-                  <View style={styles.tripsEmpty}>
-                    <MaterialCommunityIcons name="map-marker-off-outline" size={40} color={colors.status.muted} />
-                    <Text style={styles.tripsEmptyTitle}>No trips yet</Text>
-                    <Text style={styles.tripsEmptySubtitle}>
-                      Tap "Start trip" to begin recording. Trips auto-end when the device stops for 5 minutes.
-                    </Text>
-                  </View>
-                ) : (
-                  trips.map((trip) => {
-                    const isActive = trip.end_time == null;
-                    return (
-                      <View key={trip.id} style={styles.tripCard}>
-                        <TouchableOpacity
-                          style={styles.tripCardTouchable}
-                          onPress={() => isActive ? null : handleLoadTrip(trip.id)}
-                          activeOpacity={isActive ? 1 : 0.7}
-                          disabled={isActive}
-                        >
-                          <View style={styles.tripCardHeader}>
-                            <MaterialCommunityIcons
-                              name={isActive ? "record-circle" : "map-marker-path"}
-                              size={20}
-                              color={isActive ? colors.status.error : colors.accent[400]}
-                            />
-                            <Text style={styles.tripCardTitle} numberOfLines={2}>
-                              {trip.display_name || trip.name}
-                            </Text>
-                          </View>
-                          <View style={styles.tripCardMeta}>
-                            <Text style={styles.tripCardMetaText}>
-                              {format(new Date(trip.start_time), "MMM d, h:mm a")}
-                              {isActive ? " · In progress" : ` → ${format(new Date(trip.end_time!), "h:mm a")}`}
-                            </Text>
-                            <Text style={styles.tripCardMetaText}>
-                              {(trip.total_distance_km ?? 0).toFixed(1)} km
-                            </Text>
-                          </View>
-                        </TouchableOpacity>
-                        {isActive && (
-                          <TouchableOpacity
-                            style={styles.endTripButton}
-                            onPress={() => handleEndTrip(trip.id)}
-                            disabled={endTripLoading === trip.id}
-                          >
-                            {endTripLoading === trip.id ? (
-                              <ActivityIndicator size="small" color="#fff" />
-                            ) : (
-                              <Text style={styles.endTripButtonText}>End trip</Text>
-                            )}
-                          </TouchableOpacity>
-                        )}
-                      </View>
-                    );
-                  })
-                )}
-              </ScrollView>
-              )}
-            </View>
+      <View style={styles.controlsCard}>
+        <Text style={styles.label}>Device</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.deviceScroll}>
+          {devices.length === 0 ? (
+            <Text style={styles.placeholderText}>No devices</Text>
           ) : (
-          <View style={styles.controlsCard}>
-            <Text style={styles.label}>Device</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.deviceScroll}>
-              {devices.length === 0 ? (
-                <Text style={styles.placeholderText}>No devices</Text>
-              ) : (
-                devices.map((device) => {
-                  const isActive = device.id === selectedDevice;
-                  return (
-                    <TouchableOpacity
-                      key={device.id}
-                      onPress={() => setSelectedDevice(device.id)}
-                      style={[styles.deviceChip, isActive && styles.deviceChipActive]}
-                    >
-                      <Ionicons name="car-outline" size={16} color={isActive ? colors.surface.card : colors.accent[200]} style={{ marginRight: 6 }} />
-                      <Text style={[styles.deviceChipText, isActive && styles.deviceChipTextActive]}>
-                        {device.name}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })
-              )}
-            </ScrollView>
-
-            <View style={styles.dateRow}>
-              <View style={styles.dateBlock}>
-                <Text style={styles.label}>Date</Text>
+            devices.map((device) => {
+              const isActive = device.id === selectedDevice;
+              return (
                 <TouchableOpacity
-                  onPress={() => setShowDatePicker(true)}
-                  style={[styles.dateButton, routeData && styles.dateButtonSuccess]}
+                  key={device.id}
+                  onPress={() => setSelectedDevice(device.id)}
+                  style={[styles.deviceChip, isActive && styles.deviceChipActive]}
                 >
-                  <Ionicons name="calendar-outline" size={18} color={colors.accent[400]} style={{ marginRight: 8 }} />
-                  <Text style={styles.dateButtonText}>{dateLabel}</Text>
-                  <Text style={styles.dateYear}>{format(date, "yyyy")}</Text>
+                  <Ionicons name="car-outline" size={16} color={isActive ? colors.surface.card : colors.accent[200]} style={{ marginRight: 6 }} />
+                  <Text style={[styles.deviceChipText, isActive && styles.deviceChipTextActive]}>
+                    {device.name}
+                  </Text>
                 </TouchableOpacity>
-              </View>
-              <TouchableOpacity
-                onPress={() => setShowDatePicker(true)}
-                style={styles.quickDate}
-              >
-                <Text style={styles.quickDateText}>Pick date</Text>
-              </TouchableOpacity>
-            </View>
+              );
+            })
+          )}
+        </ScrollView>
 
-            {showDatePicker && (
-              <DateTimePicker
-                value={date}
-                mode="date"
-                display="default"
-                onChange={(event, selectedDate) => {
-                  setShowDatePicker(false);
-                  if (selectedDate) setDate(selectedDate);
-                }}
-              />
-            )}
-
-            {error && (
-              <View style={styles.errorCard}>
-                <Ionicons name="warning-outline" size={20} color={colors.status.error} />
-                <Text style={styles.errorText}>{error}</Text>
-                <TouchableOpacity onPress={() => { setError(null); handleLoadRoute(); }} style={styles.retryButton}>
-                  <Text style={styles.retryButtonText}>Retry</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-
+        <View style={styles.dateRow}>
+          <View style={styles.dateBlock}>
+            <Text style={styles.label}>Date</Text>
             <TouchableOpacity
-              onPress={handleLoadRoute}
-              disabled={loading}
-              style={[styles.loadButton, loading && styles.loadButtonDisabled]}
+              onPress={() => setShowDatePicker(true)}
+              style={[styles.dateButton, routeData && styles.dateButtonSuccess]}
             >
-              {loading ? (
-                <>
-                  <ActivityIndicator size="small" color="#fff" style={{ marginRight: 10 }} />
-                  <Text style={styles.loadButtonText}>Loading route…</Text>
-                </>
-              ) : (
-                <>
-                  <Ionicons name="play-circle-outline" size={22} color="#fff" style={{ marginRight: 8 }} />
-                  <Text style={styles.loadButtonText}>Load route</Text>
-                </>
-              )}
+              <Ionicons name="calendar-outline" size={18} color={colors.accent[400]} style={{ marginRight: 8 }} />
+              <Text style={styles.dateButtonText}>{dateLabel}</Text>
+              <Text style={styles.dateYear}>{format(date, "yyyy")}</Text>
             </TouchableOpacity>
           </View>
-          )}
-        </>
-      )}
+        </View>
 
-      <View
-        style={[
-          styles.mapContainer,
-          routeLoaded && !controlsExpanded && styles.mapContainerTracking,
-        ]}
-      >
+        {showDatePicker && (
+          <DateTimePicker
+            value={date}
+            mode="date"
+            display="default"
+            onChange={(event, selectedDate) => {
+              setShowDatePicker(false);
+              if (selectedDate) setDate(selectedDate);
+            }}
+          />
+        )}
+
+        {error && (
+          <View style={styles.errorCard}>
+            <Ionicons name="warning-outline" size={20} color={colors.status.error} />
+            <Text style={styles.errorText}>{error}</Text>
+            <TouchableOpacity onPress={() => { setError(null); handleLoadRoute(); }} style={styles.retryButton}>
+              <Text style={styles.retryButtonText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        <TouchableOpacity
+          onPress={handleLoadRoute}
+          disabled={loading}
+          style={[styles.loadButton, loading && styles.loadButtonDisabled]}
+        >
+          {loading ? (
+            <>
+              <ActivityIndicator size="small" color="#fff" style={{ marginRight: 10 }} />
+              <Text style={styles.loadButtonText}>Loading route…</Text>
+            </>
+          ) : (
+            <>
+              <Ionicons name="play-circle-outline" size={22} color="#fff" style={{ marginRight: 8 }} />
+              <Text style={styles.loadButtonText}>Load route</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.mapContainer}>
         {loading && !routeData ? (
           <View style={styles.loadingOverlay}>
             <ActivityIndicator size="large" color={colors.accent[400]} />
@@ -1079,14 +654,14 @@ const History = () => {
             style={{
               position: "absolute",
               left: 16,
-              bottom: controlsExpanded ? 160 : 24,
+              bottom: 160,
               zIndex: 100,
             }}
           />
         )}
 
-        {routeLoaded && controlsExpanded && (
-          <View style={[styles.speedCard, styles.speedCardCompact]}>
+        {routeLoaded && (
+          <View style={styles.speedCard}>
             <Text style={styles.speedCardLabel}>Speed</Text>
             <Speedometer speed={displaySpeed} maxSpeed={SPEEDOMETER_MAX} size="small" />
             <Text style={styles.speedCardValue}>{displaySpeed.toFixed(0)} km/h</Text>
@@ -1094,7 +669,7 @@ const History = () => {
         )}
 
         {routeLoaded && (
-          <View style={[styles.playbackBar, !controlsExpanded && styles.playbackBarCompact]}>
+          <View style={styles.playbackBar}>
           <TouchableOpacity
             onPress={() => {
               if (playbackPoints.length && playbackPosition >= playbackPoints.length - 1) {
@@ -1106,13 +681,12 @@ const History = () => {
             disabled={!playbackPoints.length}
             style={[
               styles.playButton,
-              !controlsExpanded && styles.playButtonCompact,
               !playbackPoints.length && styles.playButtonDisabled,
             ]}
           >
             <Ionicons
               name={playbackPosition >= Math.max(playbackPoints.length - 1, 0) && !isPlaying ? "play-skip-back" : isPlaying ? "pause" : "play"}
-              size={controlsExpanded ? 24 : 20}
+              size={24}
               color="white"
             />
           </TouchableOpacity>
@@ -1166,12 +740,7 @@ const History = () => {
         </View>
         )}
 
-        <View style={[styles.mapControls, routeLoaded && !controlsExpanded && styles.mapControlsTracking]}>
-          {routeLoaded && !controlsExpanded && (
-            <TouchableOpacity onPress={handleChangeRoute} style={styles.mapControlBtn} accessibilityLabel="Back">
-              <Ionicons name="arrow-back" size={24} color={colors.accent[400]} />
-            </TouchableOpacity>
-          )}
+        <View style={styles.mapControls}>
           <TouchableOpacity onPress={handleToggleStyle} style={styles.mapControlBtn}>
             <MaterialCommunityIcons name="layers" size={22} color={colors.accent[400]} />
           </TouchableOpacity>
@@ -1186,16 +755,12 @@ const History = () => {
         </View>
       </View>
 
-      <View style={[styles.infoStrip, routeLoaded && !controlsExpanded && styles.infoStripCompact]}>
+      <View style={styles.infoStrip}>
         <View style={styles.infoStripMain}>
-          <Text style={[styles.infoStripTitle, routeLoaded && !controlsExpanded && styles.infoStripTitleCompact]} numberOfLines={1}>
+          <Text style={styles.infoStripTitle} numberOfLines={1}>
             {deviceName}
           </Text>
-          {routeLoaded && !controlsExpanded && routeSummary ? (
-            <Text style={styles.infoStripMetaText} numberOfLines={1}>
-              {routeSummary.startLabel} – {routeSummary.endLabel} · {routeSummary.durationLabel} · {routeSummary.distanceKm.toFixed(1)} km
-            </Text>
-          ) : routeSummary ? (
+          {routeSummary ? (
             <View style={styles.infoStripMeta}>
               <Text style={styles.infoStripMetaText}>
                 {routeSummary.startLabel} – {routeSummary.endLabel}
@@ -1225,84 +790,6 @@ const History = () => {
 function createHistoryStyles(colors: ReturnType<typeof getThemeColors>) {
   return StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.surface.light },
-  compactBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: colors.surface.card,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.surface.border,
-  },
-  compactBarTitle: { fontSize: 14, color: colors.text.primary, flex: 1, marginRight: 12, fontFamily: "Jakarta-SemiBold" },
-  compactBarBadge: { flexDirection: "row", alignItems: "center", gap: 4 },
-  compactBarBadgeText: { fontSize: 13, color: colors.accent[400], fontFamily: "Jakarta-Medium" },
-  trackingTopSection: { backgroundColor: colors.accent[200], paddingTop: 0 },
-  trackingStatusBarBg: {
-    height: 40,
-    backgroundColor: colors.accent[400],
-    opacity: 0.85,
-  },
-  trackingInfoContainer: {
-    flexDirection: "row",
-    paddingHorizontal: 12,
-    paddingTop: 6,
-    paddingBottom: 6,
-  },
-  trackingLeftIcons: { width: 70, justifyContent: "space-around" },
-  trackingIconButton: { alignItems: "center", marginBottom: 4 },
-  trackingIconLabel: { fontSize: 9, color: colors.accent[400], marginTop: 2, fontWeight: "600" },
-  trackingIconStatus: { fontSize: 9, color: colors.text.primary, marginTop: 1, fontWeight: "600" },
-  trackingSpeedometerContainer: {
-    flex: 1,
-    alignItems: "center",
-    paddingTop: 0,
-    marginTop: -2,
-    paddingBottom: 0,
-  },
-  trackingDistanceRow: { flexDirection: "row", alignItems: "center", marginTop: 0 },
-  trackingDistanceIcon: { marginRight: 6 },
-  trackingTotalDistance: { fontSize: 14, fontWeight: "600", color: colors.text.primary },
-  trackingCurrentSpeed: { fontSize: 20, fontWeight: "bold", color: colors.text.primary, marginTop: -2 },
-  trackingRightInfo: { width: 100, justifyContent: "flex-start", gap: 4 },
-  trackingStatusCard: {
-    backgroundColor: colors.surface.card,
-    borderRadius: 8,
-    padding: 6,
-    borderWidth: 1,
-    borderColor: colors.surface.border,
-    marginBottom: 2,
-  },
-  trackingStatusHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  trackingStatusText: { color: colors.accent[400], fontSize: 12, fontWeight: "600" },
-  trackingStatusLabel: { color: colors.text.primary, fontSize: 12, fontWeight: "bold", marginTop: 4 },
-  trackingInfoCard: {
-    backgroundColor: colors.surface.card,
-    borderRadius: 8,
-    padding: 6,
-    borderWidth: 1,
-    borderColor: colors.surface.border,
-    marginBottom: 2,
-  },
-  trackingInfoRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  trackingInfoDate: { color: colors.text.primary, fontSize: 9, fontWeight: "600" },
-  trackingInfoLabel: { color: colors.text.secondary, fontSize: 11, marginTop: 2 },
-  trackingInfoTime: { color: colors.text.primary, fontSize: 11, fontWeight: "600", marginTop: 2 },
-  trackingAddressBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: colors.surface.card,
-    borderRadius: 10,
-    paddingVertical: 5,
-    paddingHorizontal: 8,
-    marginHorizontal: 12,
-    marginTop: 2,
-    marginBottom: 4,
-    borderWidth: 1,
-    borderColor: colors.surface.border,
-  },
-  trackingAddressText: { flex: 1, color: colors.text.secondary, fontSize: 10, marginLeft: 4, lineHeight: 14 },
   header: {
     paddingHorizontal: 20,
     paddingTop: 16,
@@ -1310,101 +797,9 @@ function createHistoryStyles(colors: ReturnType<typeof getThemeColors>) {
     borderBottomWidth: 1,
     borderBottomColor: colors.surface.border,
   },
-  headerWithDone: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   headerTextWrap: { flex: 1 },
   headerTitle: { fontSize: 22, fontWeight: "700", color: colors.text.primary, fontFamily: "Jakarta-Bold" },
   headerSubtitle: { fontSize: 13, color: colors.text.secondary, marginTop: 2, fontFamily: "Jakarta-Medium" },
-  doneButton: { paddingVertical: 8, paddingHorizontal: 14 },
-  doneButtonText: { fontSize: 16, color: colors.accent[400], fontFamily: "Jakarta-SemiBold" },
-  modeToggleRow: {
-    flexDirection: "row",
-    gap: 10,
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 8,
-  },
-  modeChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 22,
-    backgroundColor: colors.accent[100],
-  },
-  modeChipActive: { backgroundColor: colors.accent[400] },
-  modeChipText: { fontSize: 14, color: colors.text.secondary, fontFamily: "Jakarta-Medium" },
-  modeChipTextActive: { color: "#fff" },
-  tripsSection: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    paddingBottom: 16,
-    backgroundColor: colors.surface.card,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.surface.border,
-    maxHeight: 280,
-  },
-  tripsList: { maxHeight: 200 },
-  tripsListContent: { paddingBottom: 8, gap: 8 },
-  tripsLoading: { flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 24, gap: 10 },
-  tripsLoadingText: { fontSize: 14, color: colors.text.secondary, fontFamily: "Jakarta-Medium" },
-  tripsEmpty: {
-    alignItems: "center",
-    paddingVertical: 24,
-    paddingHorizontal: 16,
-  },
-  tripsEmptyTitle: { fontSize: 16, fontWeight: "600", color: colors.text.primary, marginTop: 12, fontFamily: "Jakarta-SemiBold" },
-  tripsEmptySubtitle: { fontSize: 13, color: colors.status.muted, textAlign: "center", marginTop: 6, lineHeight: 18, fontFamily: "Jakarta-Medium" },
-  tripCard: {
-    backgroundColor: colors.accent[100],
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.surface.border,
-    overflow: "hidden",
-  },
-  tripCardTouchable: { padding: 14 },
-  tripCardHeader: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
-  tripCardTitle: { flex: 1, fontSize: 15, fontWeight: "600", color: colors.text.primary, fontFamily: "Jakarta-SemiBold" },
-  tripCardMeta: { flexDirection: "row", justifyContent: "space-between", marginTop: 8 },
-  tripCardMetaText: { fontSize: 12, color: colors.status.muted, fontFamily: "Jakarta-Medium" },
-  startTripButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.accent[400],
-    paddingVertical: 10,
-    borderRadius: 10,
-    marginTop: 12,
-  },
-  startTripButtonText: { color: "#fff", fontSize: 15, fontFamily: "Jakarta-SemiBold" },
-  startTripInputRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 12 },
-  startTripInput: {
-    flex: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    fontSize: 14,
-    fontFamily: "Jakarta-Medium",
-  },
-  startTripConfirmBtn: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 10,
-    backgroundColor: colors.accent[400],
-  },
-  startTripCancelBtn: { paddingVertical: 10, paddingHorizontal: 12 },
-  startTripCancelText: { fontSize: 14, fontFamily: "Jakarta-Medium" },
-  endTripButton: {
-    backgroundColor: colors.status.error,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    marginHorizontal: 14,
-    marginBottom: 12,
-    borderRadius: 10,
-  },
-  endTripButtonText: { color: "#fff", fontSize: 14, fontFamily: "Jakarta-SemiBold" },
   controlsCard: {
     paddingHorizontal: 20,
     paddingVertical: 16,
@@ -1442,8 +837,6 @@ function createHistoryStyles(colors: ReturnType<typeof getThemeColors>) {
   dateButtonSuccess: { borderColor: colors.accent[400] },
   dateButtonText: { fontSize: 15, color: colors.text.primary, fontFamily: "Jakarta-Medium", flex: 1 },
   dateYear: { fontSize: 12, color: colors.status.muted },
-  quickDate: { paddingVertical: 12, paddingHorizontal: 12, justifyContent: "center" },
-  quickDateText: { fontSize: 14, color: colors.accent[400], fontFamily: "Jakarta-Medium" },
   errorCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -1470,8 +863,6 @@ function createHistoryStyles(colors: ReturnType<typeof getThemeColors>) {
   loadButtonDisabled: { backgroundColor: "#475569", opacity: 0.9 },
   loadButtonText: { color: "#fff", fontSize: 17, fontFamily: "Jakarta-Bold" },
   mapContainer: { flex: 1, position: "relative" },
-  mapContainerMax: { minHeight: 0 },
-  mapContainerTracking: { position: "relative" },
   map: { flex: 1 },
   loadingOverlay: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.surface.light },
   loadingText: { color: colors.text.secondary, marginTop: 12, fontSize: 14, fontFamily: "Jakarta-Medium" },
@@ -1507,11 +898,6 @@ function createHistoryStyles(colors: ReturnType<typeof getThemeColors>) {
   },
   speedCardLabel: { fontSize: 10, color: colors.text.secondary, marginBottom: 4, fontFamily: "Jakarta-Medium" },
   speedCardValue: { color: colors.text.primary, fontWeight: "700", fontSize: 13, marginTop: 4 },
-  speedCardCompact: {
-    padding: 8,
-    minWidth: 72,
-  },
-  speedCardValueCompact: { color: colors.text.primary, fontWeight: "700", fontSize: 14 },
   playbackBar: {
     position: "absolute",
     left: 12,
@@ -1536,8 +922,6 @@ function createHistoryStyles(colors: ReturnType<typeof getThemeColors>) {
     justifyContent: "center",
   },
   playButtonDisabled: { opacity: 0.5 },
-  playbackBarCompact: { padding: 8, paddingVertical: 6, gap: 8, left: 10, right: 10, bottom: 10 },
-  playButtonCompact: { width: 38, height: 38, borderRadius: 8 },
   playbackSliders: { flex: 1, gap: 8, minWidth: 0 },
   sliderBlock: { gap: 2 },
   sliderHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", minHeight: 16 },
@@ -1574,7 +958,6 @@ function createHistoryStyles(colors: ReturnType<typeof getThemeColors>) {
     alignItems: "center",
     justifyContent: "center",
   },
-  mapControlsTracking: { left: 15, top: 20, gap: 12 },
   infoStrip: {
     paddingHorizontal: 20,
     paddingVertical: 14,
@@ -1586,8 +969,6 @@ function createHistoryStyles(colors: ReturnType<typeof getThemeColors>) {
   infoStripTitle: { fontSize: 16, fontWeight: "700", color: colors.text.primary, fontFamily: "Jakarta-Bold" },
   infoStripMeta: { gap: 2 },
   infoStripMetaText: { fontSize: 12, color: colors.status.muted, fontFamily: "Jakarta-Medium" },
-  infoStripCompact: { paddingVertical: 8, paddingHorizontal: 16 },
-  infoStripTitleCompact: { fontSize: 14 },
 });
 }
 

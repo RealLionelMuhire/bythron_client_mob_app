@@ -1,5 +1,13 @@
 import { TextInputProps, TouchableOpacityProps } from "react-native";
 
+declare interface UserData {
+  id: number;
+  clerk_user_id: string;
+  email: string;
+  name: string | null;
+  is_admin: boolean;
+}
+
 declare interface Device {
   id: number;
   name: string;
@@ -135,6 +143,11 @@ declare interface DeviceStore {
   setCurrentLocation: (location: Location) => void;
   setLoadingLocation: (loading: boolean) => void;
   setHistoryFullScreen: (v: boolean) => void;
+}
+
+declare interface UserStore {
+  userData: UserData | null;
+  setUserData: (data: UserData) => void;
 }
 
 declare interface DeviceCardProps {
