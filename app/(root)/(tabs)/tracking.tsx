@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useAuth } from "@clerk/clerk-expo";
 import {
   View,
   Text,
@@ -25,9 +26,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { getThemeColors } from "@/constants/theme";
 import { useDeviceStore, useLocationStore } from "@/store";
-import { Device } from "@/types/type";
+import { Device, Location } from "@/types/type";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { startLocationPolling } from "@/lib/liveTracking";
+import { useDeviceWebSocket } from "@/lib/useDeviceWebSocket";
 import { MapScaleBar } from "@/components/MapScaleBar";
 import { Speedometer } from "@/components/Speedometer";
 import { TrackingMarker } from "@/components/TrackingMarker";
@@ -59,6 +60,7 @@ const Tracking = () => {
   const colors = getThemeColors(colorScheme === "dark" ? "dark" : "light");
   const styles = useMemo(() => createTrackingStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
+  const { getToken } = useAuth();
   const devices = useDeviceStore((s) => s.devices);
   const setDevices = useDeviceStore((s) => s.setDevices);
   const currentLocation = useDeviceStore((s) => s.currentLocation);
@@ -115,13 +117,15 @@ const Tracking = () => {
     refreshDevices();
   }, [setDevices]);
 
-  useEffect(() => {
-    if (!device?.id) return;
-    const cleanup = startLocationPolling(device.id, (location) => {
+  // ── Real-time location via WebSocket (replaces 5s HTTP polling) ──────────
+  const handleLiveLocation = useCallback(
+    (location: Location) => {
       setCurrentLocation(location);
-    });
-    return () => { if (cleanup) cleanup(); };
-  }, [device?.id, setCurrentLocation]);
+    },
+    [setCurrentLocation],
+  );
+
+  useDeviceWebSocket(device?.id ?? null, handleLiveLocation, undefined, getToken);
 
   useEffect(() => {
     setBatteryLevel(typeof device?.battery_level === "number" ? device.battery_level : null);
@@ -501,6 +505,7 @@ const Tracking = () => {
                 <Pressable
                   key={d.id}
                   onPress={() => {
+                    setCurrentLocation(null); // clear stale data from previous device
                     setSelectedDevice(d);
                     setDevicePickerVisible(false);
                   }}

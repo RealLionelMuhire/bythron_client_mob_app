@@ -1,8 +1,14 @@
-import { neon } from "@neondatabase/serverless";
-
 export async function POST(request: Request) {
   try {
-    const sql = neon(`${process.env.DATABASE_URL}`);
+    const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
+
+    if (!apiBaseUrl) {
+      return Response.json(
+        { error: "API base URL not configured" },
+        { status: 500 },
+      );
+    }
+
     const { name, email, clerkId } = await request.json();
 
     if (!name || !email || !clerkId) {
@@ -12,21 +18,24 @@ export async function POST(request: Request) {
       );
     }
 
-    const response = await sql`
-      INSERT INTO users (
-        name, 
-        email, 
-        clerk_id
-      ) 
-      VALUES (
-        ${name}, 
-        ${email},
-        ${clerkId}
-     );`;
-
-    return new Response(JSON.stringify({ data: response }), {
-      status: 201,
+    const response = await fetch(`${apiBaseUrl}/api/auth/sync`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        clerk_user_id: clerkId,
+        email,
+        name,
+      }),
     });
+
+    if (!response.ok) {
+      throw new Error(`Backend returned ${response.status}`);
+    }
+
+    const data = await response.json();
+    return new Response(JSON.stringify({ data }), { status: 201 });
   } catch (error) {
     console.error("Error creating user:", error);
     return Response.json({ error: "Internal Server Error" }, { status: 500 });

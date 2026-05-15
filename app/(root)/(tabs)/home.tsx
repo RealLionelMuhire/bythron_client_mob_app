@@ -19,7 +19,7 @@ import { useColorScheme } from "nativewind";
 import { icons } from "@/constants";
 import { getThemeColors } from "@/constants/theme";
 import { fetchAPI, useFetch } from "@/lib/fetch";
-import { useLocationStore, useDeviceStore } from "@/store";
+import { useLocationStore, useDeviceStore, useUserStore } from "@/store";
 import { Device } from "@/types/type";
 
 const { width } = Dimensions.get("window");
@@ -76,7 +76,7 @@ const Home = () => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          userId: user.id,
+          clerk_user_id: user.id,
           email: user.primaryEmailAddress?.emailAddress,
           name: safeName,
         }),

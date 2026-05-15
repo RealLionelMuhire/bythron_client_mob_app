@@ -30,6 +30,22 @@ declare interface Location {
   timestamp: string;
 }
 
+/**
+ * Real-time location frame pushed by the server over WebSocket.
+ * Matches the payload built in tcp_server.py → broadcast_location_update().
+ * Unlike the DB-backed `Location`, this has no `id` or `altitude`.
+ */
+declare interface LiveLocation {
+  type: "location";
+  device_id: number;
+  latitude: number;
+  longitude: number;
+  speed?: number;
+  course?: number;
+  timestamp: string;
+  gps_valid?: boolean;
+}
+
 declare interface MarkerData {
   latitude: number;
   longitude: number;
@@ -134,13 +150,13 @@ declare interface LocationStore {
 declare interface DeviceStore {
   devices: Device[];
   selectedDevice: number | null;
-  currentLocation: Location | null;
+  currentLocation: LiveLocation | Location | null;
   isLoadingLocation: boolean;
   historyFullScreen: boolean;
   setSelectedDevice: (deviceId: number) => void;
   setDevices: (devices: Device[]) => void;
   clearSelectedDevice: () => void;
-  setCurrentLocation: (location: Location) => void;
+  setCurrentLocation: (location: LiveLocation | Location | null) => void;
   setLoadingLocation: (loading: boolean) => void;
   setHistoryFullScreen: (v: boolean) => void;
 }

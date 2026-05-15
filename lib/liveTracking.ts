@@ -1,3 +1,10 @@
+/**
+ * @deprecated This module uses HTTP polling (setInterval every 5 s).
+ * Use the `useDeviceWebSocket` hook from `@/lib/useDeviceWebSocket` instead,
+ * which provides real-time updates via WebSocket with auto-reconnect and
+ * AppState-driven pause/resume. This file will be removed in a future cleanup.
+ */
+
 import { Location } from "@/types/type";
 
 /**
