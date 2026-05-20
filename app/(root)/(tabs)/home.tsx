@@ -18,9 +18,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useColorScheme } from "nativewind";
 import { icons } from "@/constants";
 import { getThemeColors } from "@/constants/theme";
-import { fetchAPI, useFetch } from "@/lib/fetch";
-import { useLocationStore, useDeviceStore, useUserStore } from "@/store";
-import { Device } from "@/types/type";
+import { useLocationStore, useDeviceStore } from "@/store";
 
 const { width } = Dimensions.get("window");
 
@@ -33,7 +31,7 @@ const Home = () => {
 
   const setUserLocation = useLocationStore((s) => s.setUserLocation);
   const devices = useDeviceStore((s) => s.devices);
-  const setDevices = useDeviceStore((s) => s.setDevices);
+  // Note: device fetch and user sync now run in (root)/_layout.tsx
 
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
@@ -58,50 +56,6 @@ const Home = () => {
       nr,
     };
   }, [devices]);
-
-  const setUserData = useUserStore((s) => s.setUserData);
-
-  // Sync user to backend on load
-  useEffect(() => {
-    if (user) {
-      const safeName =
-        user.fullName ||
-        [user.firstName, user.lastName].filter(Boolean).join(" ") ||
-        user.primaryEmailAddress?.emailAddress?.split("@")[0] ||
-        "Unknown";
-
-      fetchAPI("/api/auth/sync", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          clerk_user_id: user.id,
-          email: user.primaryEmailAddress?.emailAddress,
-          name: safeName,
-        }),
-      })
-        .then((data) => {
-          if (data) {
-            setUserData(data);
-          }
-        })
-        .catch((err) => console.error("Auth sync failed", err));
-    }
-  }, [user]);
-
-  // Fetch devices
-  const {
-    data: devicesData,
-    loading,
-    refetch,
-  } = useFetch<{ data: Device[] }>("/api/devices/");
-
-  useEffect(() => {
-    if (devicesData?.data) {
-      setDevices(devicesData.data);
-    }
-  }, [devicesData]);
 
   // Request user location permissions
   useEffect(() => {
