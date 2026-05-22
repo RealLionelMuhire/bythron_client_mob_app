@@ -56,6 +56,7 @@ export const useDeviceStore = create<DeviceStore>((set) => ({
   currentLocation: null,
   isLoadingLocation: false,
   historyFullScreen: false,
+  devicesReady: false,
   setSelectedDevice: (deviceId: number) =>
     set(() => ({ selectedDevice: deviceId })),
   setDevices: (devices: Device[]) => set(() => ({ devices })),
@@ -63,6 +64,7 @@ export const useDeviceStore = create<DeviceStore>((set) => ({
   setCurrentLocation: (location: Location | null) => set(() => ({ currentLocation: location })),
   setLoadingLocation: (loading: boolean) => set(() => ({ isLoadingLocation: loading })),
   setHistoryFullScreen: (v: boolean) => set(() => ({ historyFullScreen: v })),
+  setDevicesReady: (v: boolean) => set(() => ({ devicesReady: v })),
 }));
 
 export const useUserStore = create<UserStore>((set) => ({

@@ -10,6 +10,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Dimensions,
+  RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -18,9 +19,13 @@ import { Ionicons } from "@expo/vector-icons";
 import { useColorScheme } from "nativewind";
 import { icons } from "@/constants";
 import { getThemeColors } from "@/constants/theme";
-import { useLocationStore, useDeviceStore } from "@/store";
+import { useLocationStore, useDeviceStore, useUserStore } from "@/store";
+import { refreshDevices } from "@/app/(root)/_layout";
 
 const { width } = Dimensions.get("window");
+
+/** Devices not seen within this threshold are counted as NR (No Response). */
+const NR_THRESHOLD_MS = 15 * 60 * 1000; // 15 minutes
 
 const Home = () => {
   const { colorScheme } = useColorScheme();
@@ -31,7 +36,16 @@ const Home = () => {
 
   const setUserLocation = useLocationStore((s) => s.setUserLocation);
   const devices = useDeviceStore((s) => s.devices);
+  const devicesReady = useDeviceStore((s) => s.devicesReady);
   // Note: device fetch and user sync now run in (root)/_layout.tsx
+
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await refreshDevices();
+    setRefreshing(false);
+  };
 
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
@@ -44,17 +58,16 @@ const Home = () => {
     if (!devices || devices.length === 0) {
       return { total: 0, moving: 0, idle: 0, parked: 0, nr: 0 };
     }
+    const now = Date.now();
     const moving = devices.filter((d) => d.status === "online" && d.speed && d.speed > 5).length;
     const idle = devices.filter((d) => d.status === "online" && (!d.speed || d.speed <= 5)).length;
     const parked = devices.filter((d) => d.status === "offline").length;
-    const nr = 0;
-    return {
-      total: devices.length,
-      moving,
-      idle,
-      parked,
-      nr,
-    };
+    // NR: no update received in the last 15 minutes
+    const nr = devices.filter((d) => {
+      if (!d.last_seen) return true;
+      return now - new Date(d.last_seen).getTime() > NR_THRESHOLD_MS;
+    }).length;
+    return { total: devices.length, moving, idle, parked, nr };
   }, [devices]);
 
   // Request user location permissions
@@ -80,22 +93,12 @@ const Home = () => {
   }, []);
 
   const handleNavigation = (screen: string) => {
-    // Navigate to different screens/tabs
     switch (screen) {
-      case "tracking":
-        router.push("/(root)/(tabs)/tracking");
-        break;
-      case "vehicles":
-        router.push("/(root)/(tabs)/vehicles");
-        break;
-      case "alerts":
-        router.push("/(root)/(tabs)/alerts");
-        break;
-      case "settings":
-        router.push("/(root)/(tabs)/settings");
-        break;
-      default:
-        break;
+      case "tracking": router.push("/(root)/(tabs)/tracking"); break;
+      case "vehicles": router.push("/(root)/(tabs)/vehicles"); break;
+      case "alerts":   router.push("/(root)/(tabs)/alerts");   break;
+      case "settings": router.push("/(root)/(tabs)/settings"); break;
+      default: break;
     }
   };
 
@@ -105,12 +108,10 @@ const Home = () => {
       <View className={`pt-10 ${isDark ? "bg-slate-800" : "bg-accent-200"}`}>
         <View className="px-5 py-2">
           <View className="flex-row justify-between items-center">
-            {/* Hamburger Menu Icon */}
             <TouchableOpacity className="p-2">
               <Ionicons name="menu" size={28} color={colors.text.primary} />
             </TouchableOpacity>
             <Text className={`text-xl font-JakartaBold ${isDark ? "text-slate-100" : "text-slate-900"}`}>Dashboard</Text>
-            {/* Settings Gear Icon */}
             <TouchableOpacity className="p-2" onPress={() => router.push("/(root)/(tabs)/settings")}>
               <Ionicons name="settings-outline" size={26} color={colors.text.primary} />
             </TouchableOpacity>
@@ -122,6 +123,14 @@ const Home = () => {
         className="flex-1"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 120 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={colors.accent[400]}
+            colors={[colors.accent[400]]}
+          />
+        }
       >
         {/* User Profile Section */}
         <View className={`pb-6 ${isDark ? "bg-slate-800" : "bg-accent-200"}`}>
@@ -129,10 +138,7 @@ const Home = () => {
             <View className="flex-row items-center mb-5">
               <View className={`w-20 h-20 rounded-full items-center justify-center mr-4 border ${isDark ? "bg-slate-700 border-slate-600" : "bg-accent-100 border-accent-400"}`}>
                 {user?.imageUrl ? (
-                  <Image
-                    source={{ uri: user.imageUrl }}
-                    className="w-full h-full rounded-full"
-                  />
+                  <Image source={{ uri: user.imageUrl }} className="w-full h-full rounded-full" />
                 ) : (
                   <Image source={icons.person} className="w-12 h-12" tintColor={colors.accent[400]} />
                 )}
@@ -170,14 +176,24 @@ const Home = () => {
                   Total Vehicles: {stats.total}
                 </Text>
               </View>
-              <TouchableOpacity onPress={refetch}>
-                <Image source={icons.search} className="w-6 h-6" tintColor={colors.accent[400]} />
+              {/* Pull-to-refresh hint icon */}
+              <TouchableOpacity onPress={handleRefresh} disabled={refreshing}>
+                <Ionicons
+                  name="refresh"
+                  size={22}
+                  color={refreshing ? colors.status.muted : colors.accent[400]}
+                />
               </TouchableOpacity>
             </View>
 
-            {/* Stats Grid */}
-            {loading ? (
-              <ActivityIndicator size="small" color={colors.accent[400]} />
+            {/* Stats Grid — show skeleton if devices not yet loaded */}
+            {!devicesReady ? (
+              <View className="items-center py-6">
+                <ActivityIndicator size="small" color={colors.accent[400]} />
+                <Text className={`text-xs font-JakartaMedium mt-2 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                  Loading fleet data…
+                </Text>
+              </View>
             ) : (
               <View className="flex-row justify-between">
                 {/* Moving */}
@@ -204,7 +220,7 @@ const Home = () => {
                   <Text className={`text-sm font-JakartaMedium ${isDark ? "text-slate-300" : "text-slate-700"}`}>Parked</Text>
                 </View>
 
-                {/* NR */}
+                {/* NR — derived from last_seen threshold */}
                 <View className="items-center">
                   <View className={`w-20 h-20 rounded-full items-center justify-center mb-2 border-[6px] border-status-muted ${isDark ? "bg-slate-700" : "bg-accent-50"}`}>
                     <Text className={`text-2xl font-JakartaBold ${isDark ? "text-slate-100" : "text-slate-900"}`}>{stats.nr}</Text>

@@ -3,27 +3,44 @@
  *
  * Root layout for the authenticated section of the app.
  * Runs once after sign-in, regardless of which tab opens first:
+ *   - Registers the Clerk token getter for all fetchAPI calls app-wide
  *   - Syncs the Clerk user to the backend
  *   - Fetches the device list into Zustand
+ *   - Marks devicesReady=true so screens can show skeletons while loading
  *
- * This ensures Tracking, Alerts, Command, Settings, and Vehicles all have
- * device data available even if the user never visits the Home tab.
+ * Also exposes refreshDevices() so screens can pull-to-refresh without
+ * bypassing the auth token logic.
  */
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { Slot } from "expo-router";
 import { useUser, useAuth } from "@clerk/clerk-expo";
 
-import { fetchAPI } from "@/lib/fetch";
+import { fetchAPI, setAuthTokenGetter } from "@/lib/fetch";
 import { useDeviceStore, useUserStore } from "@/store";
 import { Device } from "@/types/type";
+
+export const refreshDevices = async (): Promise<void> => {
+  const { setDevices, setDevicesReady } = useDeviceStore.getState();
+  try {
+    const res = await fetchAPI("/api/devices/") as { data?: Device[] } | Device[];
+    const list: Device[] = Array.isArray(res)
+      ? res
+      : (res as { data?: Device[] }).data ?? [];
+    setDevices(list);
+  } catch (err) {
+    console.error("[refreshDevices] Failed:", err);
+  } finally {
+    setDevicesReady(true);
+  }
+};
 
 export default function RootLayout() {
   const { user } = useUser();
   const { getToken } = useAuth();
 
-  const setDevices  = useDeviceStore((s) => s.setDevices);
   const setUserData = useUserStore((s) => s.setUserData);
+  const setDevicesReady = useDeviceStore((s) => s.setDevicesReady);
 
   // Track whether we've already run the bootstrap so it only fires once
   // per auth session, not on every re-render or navigation.
@@ -34,6 +51,10 @@ export default function RootLayout() {
     bootstrappedRef.current = true;
 
     const bootstrap = async () => {
+      // ── 0. Register auth token getter for all fetchAPI calls app-wide ───
+      //    Must run before any child screen's fetchAPI call fires.
+      setAuthTokenGetter(getToken);
+
       // ── 1. Build auth header ──────────────────────────────────────────────
       let headers: Record<string, string> = { "Content-Type": "application/json" };
       try {
@@ -64,20 +85,7 @@ export default function RootLayout() {
         .catch((err) => console.error("[RootLayout] Auth sync failed:", err));
 
       // ── 3. Fetch devices ──────────────────────────────────────────────────
-      try {
-        const res = await fetchAPI("/api/devices/", { headers }) as
-          | { data?: Device[] }
-          | Device[];
-
-        // Backend returns either { data: [...] } or a plain array
-        const list: Device[] = Array.isArray(res)
-          ? res
-          : (res as { data?: Device[] }).data ?? [];
-
-        setDevices(list);
-      } catch (err) {
-        console.error("[RootLayout] Failed to fetch devices:", err);
-      }
+      await refreshDevices();
     };
 
     bootstrap();

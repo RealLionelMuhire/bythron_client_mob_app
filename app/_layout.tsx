@@ -7,6 +7,8 @@ import "react-native-reanimated";
 import { LogBox } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
+import { AppErrorBoundary } from "@/components/ErrorBoundary";
+
 import { ThemeInitializer } from "@/components/ThemeInitializer";
 import { ThemeWrapper } from "@/components/ThemeWrapper";
 import { tokenCache } from "@/lib/auth";
@@ -47,12 +49,14 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <ClerkProvider tokenCache={tokenCache} publishableKey={publishableKey}>
-        <ThemeInitializer />
-        <ThemeWrapper>
-          <Slot />
-        </ThemeWrapper>
-      </ClerkProvider>
+      <AppErrorBoundary>
+        <ClerkProvider tokenCache={tokenCache} publishableKey={publishableKey}>
+          <ThemeInitializer />
+          <ThemeWrapper>
+            <Slot />
+          </ThemeWrapper>
+        </ClerkProvider>
+      </AppErrorBoundary>
     </GestureHandlerRootView>
   );
 }

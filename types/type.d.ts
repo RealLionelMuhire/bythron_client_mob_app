@@ -153,12 +153,14 @@ declare interface DeviceStore {
   currentLocation: LiveLocation | Location | null;
   isLoadingLocation: boolean;
   historyFullScreen: boolean;
+  devicesReady: boolean;
   setSelectedDevice: (deviceId: number) => void;
   setDevices: (devices: Device[]) => void;
   clearSelectedDevice: () => void;
   setCurrentLocation: (location: LiveLocation | Location | null) => void;
   setLoadingLocation: (loading: boolean) => void;
   setHistoryFullScreen: (v: boolean) => void;
+  setDevicesReady: (v: boolean) => void;
 }
 
 declare interface UserStore {

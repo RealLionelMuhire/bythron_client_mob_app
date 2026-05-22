@@ -117,12 +117,7 @@ export default function Layout() {
         }}
       />
 
-      <Tabs.Screen
-        name="home_old"
-        options={{
-          href: null,
-        }}
-      />
+
 
       <Tabs.Screen
         name="profile"

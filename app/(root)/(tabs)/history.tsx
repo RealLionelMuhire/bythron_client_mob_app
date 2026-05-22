@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useFocusEffect } from "expo-router";
 import ReactNative, {
   ActivityIndicator,
   Dimensions,
@@ -57,7 +58,15 @@ const History = () => {
   const devices = useDeviceStore((s) => s.devices);
   const selectedDevice = useDeviceStore((s) => s.selectedDevice);
   const setSelectedDevice = useDeviceStore((s) => s.setSelectedDevice);
-  const setDevices = useDeviceStore((s) => s.setDevices);
+  const setHistoryFullScreen = useDeviceStore((s) => s.setHistoryFullScreen);
+
+  // Reset the full-screen flag whenever the user leaves this tab,
+  // so the tab bar is never left hidden on other screens.
+  useFocusEffect(
+    useCallback(() => {
+      return () => setHistoryFullScreen(false);
+    }, [setHistoryFullScreen])
+  );
 
   const [date, setDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -81,24 +90,8 @@ const History = () => {
 
   const routeLoaded = !!(routeData || routeLineData);
 
-  useEffect(() => {
-    if (devices.length > 0 || loading) return;
 
-    const fetchDevices = async () => {
-      try {
-        const data = await fetchAPI("/api/devices/");
-        if (Array.isArray(data)) {
-          setDevices(data as Device[]);
-        } else if (Array.isArray(data?.data)) {
-          setDevices(data.data as Device[]);
-        }
-      } catch (err) {
-        console.error("Failed to fetch devices", err);
-      }
-    };
 
-    fetchDevices();
-  }, [devices.length, loading, setDevices]);
 
   useEffect(() => {
     if (!selectedDevice && devices.length > 0) {
