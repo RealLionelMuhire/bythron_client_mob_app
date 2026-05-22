@@ -19,7 +19,7 @@ import { formatDistanceToNow } from "date-fns";
 import { getThemeColors } from "@/constants/theme";
 import { fetchAPI } from "@/lib/fetch";
 import { useDeviceStore, useUserStore } from "@/store";
-import { refreshDevices } from "@/app/(root)/_layout";
+import { refreshDevices } from "@/lib/deviceService";
 import { AlertDialog, useDialog } from "@/components/AppModals";
 import { Device } from "@/types/type";
 

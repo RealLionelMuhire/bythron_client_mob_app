@@ -12,28 +12,14 @@
  * bypassing the auth token logic.
  */
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef } from "react";
 import { Slot } from "expo-router";
 import { useUser, useAuth } from "@clerk/clerk-expo";
 
 import { fetchAPI, setAuthTokenGetter } from "@/lib/fetch";
+import { refreshDevices } from "@/lib/deviceService";
 import { useDeviceStore, useUserStore } from "@/store";
-import { Device } from "@/types/type";
 
-export const refreshDevices = async (): Promise<void> => {
-  const { setDevices, setDevicesReady } = useDeviceStore.getState();
-  try {
-    const res = await fetchAPI("/api/devices/") as { data?: Device[] } | Device[];
-    const list: Device[] = Array.isArray(res)
-      ? res
-      : (res as { data?: Device[] }).data ?? [];
-    setDevices(list);
-  } catch (err) {
-    console.error("[refreshDevices] Failed:", err);
-  } finally {
-    setDevicesReady(true);
-  }
-};
 
 export default function RootLayout() {
   const { user } = useUser();

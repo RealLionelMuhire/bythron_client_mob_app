@@ -13,6 +13,7 @@
       "resizeMode": "contain",
       "backgroundColor": "#2F80ED"
     },
+
     "ios": {
       "bundleIdentifier": "com.bythron.gpstracker",
       "supportsTablet": true

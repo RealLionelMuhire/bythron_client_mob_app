@@ -32,7 +32,7 @@ import { useDeviceWebSocket } from "@/lib/useDeviceWebSocket";
 import { MapScaleBar } from "@/components/MapScaleBar";
 import { Speedometer } from "@/components/Speedometer";
 import { TrackingMarker } from "@/components/TrackingMarker";
-import { fetchAPI } from "@/lib/fetch";
+
 
 const normalizeBearing = (value: number) => ((value % 360) + 360) % 360;
 const interpolateBearing = (from: number, to: number, t: number) => {
@@ -62,7 +62,6 @@ const Tracking = () => {
   const insets = useSafeAreaInsets();
   const { getToken } = useAuth();
   const devices = useDeviceStore((s) => s.devices);
-  const setDevices = useDeviceStore((s) => s.setDevices);
   const currentLocation = useDeviceStore((s) => s.currentLocation);
   const setCurrentLocation = useDeviceStore((s) => s.setCurrentLocation);
   const userLatitude = useLocationStore((s) => s.userLatitude);
@@ -105,17 +104,6 @@ const Tracking = () => {
     }
   }, [devices, selectedDevice]);
 
-  useEffect(() => {
-    const refreshDevices = async () => {
-      try {
-        const res = await fetchAPI("/api/devices/") as { data?: Device[] };
-        if (res?.data) setDevices(res.data);
-      } catch (e) {
-        console.error("Failed to refresh devices:", e);
-      }
-    };
-    refreshDevices();
-  }, [setDevices]);
 
   // ── Real-time location via WebSocket (replaces 5s HTTP polling) ──────────
   const handleLiveLocation = useCallback(

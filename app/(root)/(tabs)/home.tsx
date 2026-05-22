@@ -20,7 +20,7 @@ import { useColorScheme } from "nativewind";
 import { icons } from "@/constants";
 import { getThemeColors } from "@/constants/theme";
 import { useLocationStore, useDeviceStore, useUserStore } from "@/store";
-import { refreshDevices } from "@/app/(root)/_layout";
+import { refreshDevices } from "@/lib/deviceService";
 
 const { width } = Dimensions.get("window");
 

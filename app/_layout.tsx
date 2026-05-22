@@ -3,12 +3,13 @@ import { useFonts } from "expo-font";
 import { Slot } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
+import { View } from "react-native";
 import "react-native-reanimated";
 import { LogBox } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 import { AppErrorBoundary } from "@/components/ErrorBoundary";
-
+import { NetworkBanner } from "@/components/NetworkBanner";
 import { ThemeInitializer } from "@/components/ThemeInitializer";
 import { ThemeWrapper } from "@/components/ThemeWrapper";
 import { tokenCache } from "@/lib/auth";
@@ -53,7 +54,10 @@ export default function RootLayout() {
         <ClerkProvider tokenCache={tokenCache} publishableKey={publishableKey}>
           <ThemeInitializer />
           <ThemeWrapper>
-            <Slot />
+            <View style={{ flex: 1 }}>
+              <Slot />
+              <NetworkBanner />
+            </View>
           </ThemeWrapper>
         </ClerkProvider>
       </AppErrorBoundary>
