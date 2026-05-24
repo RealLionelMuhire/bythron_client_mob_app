@@ -1,7 +1,7 @@
 module.exports = {
   expo: {
-    name: "uber",
-    slug: "uber",
+    name: "Track IQ",
+    slug: "track-iq",
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/images/icon.png",
@@ -42,6 +42,14 @@ module.exports = {
         "@rnmapbox/maps",
         {
           RNMapboxMapsImpl: "mapbox",
+        },
+      ],
+      [
+        "expo-camera",
+        {
+          cameraPermission: "Allow Track IQ to use the camera to scan GPS device QR codes.",
+          microphonePermission: false,
+          recordAudioAndroid: false,
         },
       ],
     ],

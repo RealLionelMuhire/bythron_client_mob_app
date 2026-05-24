@@ -1,4 +1,5 @@
-import { router } from "expo-router";
+import { useAuth } from "@clerk/clerk-expo";
+import { router, Redirect } from "expo-router";
 import { useMemo, useRef, useState } from "react";
 import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -10,10 +11,15 @@ import { onboarding } from "@/constants";
 import { useColorScheme } from "nativewind";
 
 const Home = () => {
+  const { isSignedIn } = useAuth();
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === "dark";
   const colors = getThemeColors(isDark ? "dark" : "light");
   const styles = useMemo(() => createStyles(colors), [colors]);
+
+  if (isSignedIn) {
+    return <Redirect href="/(root)/(tabs)/home" />;
+  }
 
   const swiperRef = useRef<Swiper>(null);
   const [activeIndex, setActiveIndex] = useState(0);

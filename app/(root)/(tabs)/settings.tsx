@@ -19,6 +19,7 @@ import { fetchAPI } from "@/lib/fetch";
 import { saveColorScheme } from "@/lib/theme";
 import { useDeviceStore } from "@/store";
 import { AlertDialog, ConfirmModal, useDialog, useConfirmModal } from "@/components/AppModals";
+import { clearOnboardingState } from "@/lib/onboarding";
 
 const Settings = () => {
   const { user } = useUser();
@@ -71,10 +72,11 @@ const Settings = () => {
       iconColor: colors.status.error,
       label: "Sign out",
       color: colors.status.error,
-      onConfirm: () => {
+      onConfirm: async () => {
         hideConfirm();
-        signOut();
-        router.replace("/(auth)/sign-in");
+        await clearOnboardingState();
+        await signOut();
+        router.replace("/(auth)/sign-up");
       },
     });
   }, [signOut, showConfirm, hideConfirm]);
@@ -223,7 +225,7 @@ const Settings = () => {
                 {user?.fullName || user?.firstName || "User"}
               </Text>
               <Text className={`text-sm font-JakartaMedium ${isDark ? "text-slate-400" : "text-slate-500"}`}>
-                {user?.primaryEmailAddress?.emailAddress || ""}
+                {user?.primaryEmailAddress?.emailAddress || user?.primaryPhoneNumber?.phoneNumber || ""}
               </Text>
             </View>
           </View>

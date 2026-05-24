@@ -1,274 +1,290 @@
+/**
+ * app/(auth)/sign-up.tsx
+ *
+ * Phone-number sign-up screen.
+ * Collects full name + phone number, calls Clerk phone-code flow,
+ * then navigates to the OTP verification screen.
+ */
+
 import { useSignUp, useAuth } from "@clerk/clerk-expo";
 import { router, Redirect } from "expo-router";
 import { useMemo, useState } from "react";
-import { Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { ReactNativeModal } from "react-native-modal";
+import {
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  ActivityIndicator,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useColorScheme } from "nativewind";
 
 import CustomButton from "@/components/CustomButton";
-import InputField from "@/components/InputField";
-import OAuth from "@/components/OAuth";
 import { getThemeColors } from "@/constants/theme";
 import { icons, images } from "@/constants";
-import { fetchAPI } from "@/lib/fetch";
+import { setSignupPhone, setSignupName } from "@/lib/onboarding";
 
 const SignUp = () => {
-  const { isLoaded, signUp, setActive } = useSignUp();
+  const { isLoaded, signUp } = useSignUp();
   const { isSignedIn } = useAuth();
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === "dark";
   const colors = getThemeColors(isDark ? "dark" : "light");
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
 
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [form, setForm] = useState({
-    name: "",
-    email: "",
-    password: "",
-  });
-  const [verification, setVerification] = useState({
-    state: "default",
-    error: "",
-    code: "",
-  });
+  const [form, setForm] = useState({ name: "", phone: "" });
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [focusedField, setFocusedField] = useState<string | null>(null);
 
   if (isSignedIn) {
     return <Redirect href="/(root)/(tabs)/home" />;
   }
 
-  const onSignUpPress = async () => {
+  const onContinue = async () => {
     if (!isLoaded) return;
-    try {
-      await signUp.create({
-        emailAddress: form.email,
-        password: form.password,
-      });
-      await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
-      setVerification({ ...verification, state: "pending" });
-    } catch (err: any) {
-      console.log(JSON.stringify(err, null, 2));
-      Alert.alert("Error", err.errors[0].longMessage);
-    }
-  };
 
-  const onPressVerify = async () => {
-    if (!isLoaded) return;
+    const name  = form.name.trim();
+    const phone = form.phone.trim();
+
+    if (!name) {
+      setError("Please enter your full name.");
+      return;
+    }
+    if (!phone || phone.length < 8) {
+      setError("Please enter a valid phone number.");
+      return;
+    }
+
+    // Build E.164: prefix +250 if user hasn't typed the country code
+    const e164 = phone.startsWith("+") ? phone : `+250${phone.replace(/^0/, "")}`;
+
+    setIsLoading(true);
+    setError(null);
+
     try {
-      const completeSignUp = await signUp.attemptEmailAddressVerification({
-        code: verification.code,
+      // Save for use in OTP screen and profile-save step
+      await setSignupName(name);
+      await setSignupPhone(e164);
+
+      await signUp!.create({
+        firstName: name.split(" ")[0],
+        lastName:  name.split(" ").slice(1).join(" ") || undefined,
+        phoneNumber: e164,
       });
-      if (completeSignUp.status === "complete") {
-        await fetchAPI("/(api)/user", {
-          method: "POST",
-          body: JSON.stringify({
-            name: form.name,
-            email: form.email,
-            clerkId: completeSignUp.createdUserId,
-          }),
-        });
-        await setActive({ session: completeSignUp.createdSessionId });
-        setVerification({ ...verification, state: "success" });
-      } else {
-        setVerification({
-          ...verification,
-          error: "Verification failed. Please try again.",
-          state: "failed",
-        });
-      }
+
+      await signUp!.preparePhoneNumberVerification({
+        strategy: "phone_code",
+      });
+
+      router.push("/(auth)/otp-verify" as any);
     } catch (err: any) {
-      setVerification({
-        ...verification,
-        error: err.errors[0]?.longMessage ?? "Verification failed",
-        state: "failed",
-      });
+      const msg =
+        err?.errors?.[0]?.longMessage ??
+        err?.errors?.[0]?.message ??
+        "Sign-up failed. Please try again.";
+      setError(msg);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    <ScrollView style={[styles.scroll, { backgroundColor: colors.surface.light }]}>
-      <View style={[styles.container, { backgroundColor: colors.surface.light }]}>
-        <View style={styles.hero}>
-          <Image source={images.signUpCar} style={styles.heroImage} resizeMode="cover" />
-          <Text style={[styles.heroTitle, { color: colors.text.primary }]}>
-            Create Your Account
-          </Text>
-        </View>
-
-        <View style={styles.form}>
-          <InputField
-            label="Name"
-            placeholder="Enter name"
-            icon={icons.person}
-            value={form.name}
-            onChangeText={(value) => setForm({ ...form, name: value })}
-          />
-          <InputField
-            label="Email"
-            placeholder="Enter email"
-            icon={icons.email}
-            textContentType="emailAddress"
-            value={form.email}
-            onChangeText={(value) => setForm({ ...form, email: value })}
-          />
-          <InputField
-            label="Password"
-            placeholder="Enter password"
-            icon={icons.lock}
-            secureTextEntry={true}
-            textContentType="password"
-            value={form.password}
-            onChangeText={(value) => setForm({ ...form, password: value })}
-          />
-          <CustomButton title="Sign Up" onPress={onSignUpPress} className="mt-6" />
-          <OAuth />
-
-          <View style={styles.linkWrap}>
-            <Text style={[styles.linkText, { color: colors.text.secondary }]}>
-              Already have an account?{" "}
-            </Text>
-            <TouchableOpacity onPress={() => router.push("/(auth)/sign-in")}>
-              <Text style={[styles.linkAccent, { color: colors.accent[400] }]}>
-                Log In
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <ReactNativeModal
-          isVisible={verification.state === "pending"}
-          onModalHide={() => {
-            if (verification.state === "success") setShowSuccessModal(true);
-          }}
+    <SafeAreaView style={[styles.safe, { backgroundColor: colors.surface.light }]}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          <View style={[styles.modal, { backgroundColor: colors.surface.card }]}>
-            <Text style={[styles.modalTitle, { color: colors.text.primary }]}>
-              Verification
-            </Text>
-            <Text style={[styles.modalSubtitle, { color: colors.text.secondary }]}>
-              We've sent a verification code to {form.email}.
-            </Text>
-            <InputField
-              label="Code"
-              icon={icons.lock}
-              placeholder="12345"
-              value={verification.code}
-              keyboardType="numeric"
-              onChangeText={(code) =>
-                setVerification({ ...verification, code })
-              }
-            />
-            {verification.error ? (
-              <Text style={[styles.errorText, { color: colors.status.error }]}>
-                {verification.error}
-              </Text>
-            ) : null}
-            <CustomButton
-              title="Verify Email"
-              onPress={onPressVerify}
-              className="mt-5"
-              bgVariant="success"
-            />
+          {/* ── Brand Header ── */}
+          <View style={styles.brandRow}>
+            <View style={styles.brandTextWrap}>
+              <Text style={[styles.brandTitle, { color: colors.accent[500] }]}>Track</Text>
+              <Text style={[styles.brandTitle, { color: colors.text.primary }]}>{" "}IQ</Text>
+            </View>
+            <Image source={images.bythronLogo} style={styles.logo} resizeMode="contain" />
           </View>
-        </ReactNativeModal>
 
-        <ReactNativeModal isVisible={showSuccessModal}>
-          <View style={[styles.modal, { backgroundColor: colors.surface.card }]}>
-            <Image source={images.check} style={styles.successImage} />
-            <Text style={[styles.successTitle, { color: colors.text.primary }]}>
-              Verified
+          {/* ── Welcome copy ── */}
+          <View style={styles.welcomeBlock}>
+            <Text style={[styles.welcomeTitle, { color: colors.text.primary }]}>
+              Create your account
             </Text>
-            <Text style={[styles.successSubtitle, { color: colors.text.secondary }]}>
-              You have successfully verified your account.
+            <Text style={[styles.welcomeSub, { color: colors.text.muted }]}>
+              Start monitoring your assets with Track IQ
             </Text>
-            <CustomButton
-              title="Browse Home"
-              onPress={() => router.push("/(root)/(tabs)/home")}
-              className="mt-5"
-            />
           </View>
-        </ReactNativeModal>
-      </View>
-    </ScrollView>
+
+          {/* ── Form ── */}
+          <View style={styles.form}>
+
+            {/* Full Name */}
+            <View style={styles.fieldWrap}>
+              <Text style={[styles.label, { color: colors.text.secondary }]}>Full Name</Text>
+              <View
+                style={[
+                  styles.inputRow,
+                  {
+                    backgroundColor: isDark ? colors.surface.card : "#F0F6FF",
+                    borderColor:
+                      focusedField === "name" ? colors.accent[500] : colors.surface.border,
+                  },
+                ]}
+              >
+                <Image source={icons.person} style={styles.inputIcon} />
+                <TextInput
+                  style={[styles.input, { color: colors.text.primary }]}
+                  placeholder="Enter your full name"
+                  placeholderTextColor={colors.text.muted}
+                  textContentType="name"
+                  autoCapitalize="words"
+                  value={form.name}
+                  onChangeText={(v) => setForm({ ...form, name: v })}
+                  onFocus={() => setFocusedField("name")}
+                  onBlur={() => setFocusedField(null)}
+                  returnKeyType="next"
+                />
+              </View>
+            </View>
+
+            {/* Phone Number */}
+            <View style={styles.fieldWrap}>
+              <Text style={[styles.label, { color: colors.text.secondary }]}>Phone Number</Text>
+              <View
+                style={[
+                  styles.inputRow,
+                  {
+                    backgroundColor: isDark ? colors.surface.card : "#F0F6FF",
+                    borderColor:
+                      focusedField === "phone" ? colors.accent[500] : colors.surface.border,
+                  },
+                ]}
+              >
+                {/* Country code badge */}
+                <View style={[styles.countryBadge, { backgroundColor: colors.accent[500] + "22" }]}>
+                  <Text style={[styles.countryCode, { color: colors.accent[500] }]}>🇷🇼 +250</Text>
+                </View>
+                <TextInput
+                  style={[styles.input, { color: colors.text.primary }]}
+                  placeholder="7XX XXX XXX"
+                  placeholderTextColor={colors.text.muted}
+                  keyboardType="phone-pad"
+                  textContentType="telephoneNumber"
+                  value={form.phone}
+                  onChangeText={(v) => setForm({ ...form, phone: v })}
+                  onFocus={() => setFocusedField("phone")}
+                  onBlur={() => setFocusedField(null)}
+                  returnKeyType="done"
+                  onSubmitEditing={onContinue}
+                  maxLength={12}
+                />
+              </View>
+              <Text style={[styles.hint, { color: colors.text.muted }]}>
+                We'll send a 6-digit code to verify this number
+              </Text>
+            </View>
+
+            {/* Error */}
+            {error ? (
+              <View style={[styles.errorBox, { backgroundColor: colors.status.error + "18", borderColor: colors.status.error }]}>
+                <Text style={[styles.errorText, { color: colors.status.error }]}>
+                  {error}
+                </Text>
+              </View>
+            ) : null}
+
+            <CustomButton
+              title={isLoading ? "Sending code…" : "Continue"}
+              onPress={onContinue}
+              className="mt-2"
+            />
+
+            <View style={styles.linkRow}>
+              <Text style={[styles.linkText, { color: colors.text.muted }]}>
+                Already have an account?{" "}
+              </Text>
+              <TouchableOpacity onPress={() => router.push("/(auth)/sign-in")}>
+                <Text style={[styles.linkAccent, { color: colors.accent[500] }]}>Sign In</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
-function createStyles(colors: ReturnType<typeof getThemeColors>) {
+function createStyles(colors: ReturnType<typeof getThemeColors>, isDark: boolean) {
   return StyleSheet.create({
-    scroll: { flex: 1 },
-    container: { flex: 1 },
-    hero: {
-      position: "relative",
-      width: "100%",
-      height: 250,
-    },
-    heroImage: {
-      position: "absolute",
-      zIndex: 0,
-      width: "100%",
-      height: 250,
-    },
-    heroTitle: {
-      position: "absolute",
-      bottom: 20,
-      left: 20,
-      fontSize: 24,
-      fontFamily: "Jakarta-SemiBold",
-    },
-    form: { padding: 20 },
-    linkWrap: {
+    safe: { flex: 1 },
+    scroll: { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 40 },
+    brandRow: {
       flexDirection: "row",
-      flexWrap: "wrap",
-      justifyContent: "center",
       alignItems: "center",
-      marginTop: 40,
-    },
-    linkText: {
-      fontSize: 18,
-      fontFamily: "Jakarta-Medium",
-    },
-    linkAccent: {
-      fontSize: 18,
-      fontFamily: "Jakarta-SemiBold",
-    },
-    modal: {
-      paddingHorizontal: 28,
-      paddingVertical: 36,
-      borderRadius: 16,
-      minHeight: 300,
-      borderWidth: 1,
-      borderColor: colors.surface.border,
-    },
-    modalTitle: {
-      fontSize: 24,
-      fontFamily: "Jakarta-ExtraBold",
+      justifyContent: "space-between",
+      paddingTop: 24,
       marginBottom: 8,
     },
-    modalSubtitle: {
-      fontSize: 16,
-      fontFamily: "Jakarta-Medium",
-      marginBottom: 20,
+    brandTextWrap: { flexDirection: "row", alignItems: "baseline" },
+    brandTitle: { fontSize: 34, fontFamily: "Jakarta-ExtraBold", letterSpacing: -0.5 },
+    logo: { width: 54, height: 54 },
+    welcomeBlock: { marginTop: 28, marginBottom: 32 },
+    welcomeTitle: { fontSize: 26, fontFamily: "Jakarta-Bold", marginBottom: 6 },
+    welcomeSub: { fontSize: 15, fontFamily: "Jakarta-Medium", lineHeight: 22 },
+    form: {},
+    fieldWrap: { marginBottom: 18 },
+    label: {
+      fontSize: 13,
+      fontFamily: "Jakarta-SemiBold",
+      marginBottom: 8,
+      letterSpacing: 0.3,
+      textTransform: "uppercase",
     },
-    errorText: {
-      fontSize: 14,
-      marginTop: 4,
+    inputRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      borderWidth: 1.5,
+      borderRadius: 14,
+      paddingHorizontal: 14,
+      height: 54,
     },
-    successImage: {
-      width: 110,
-      height: 110,
-      alignSelf: "center",
-      marginVertical: 20,
+    countryBadge: {
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 8,
+      marginRight: 10,
     },
-    successTitle: {
-      fontSize: 28,
-      fontFamily: "Jakarta-Bold",
-      textAlign: "center",
+    countryCode: { fontSize: 14, fontFamily: "Jakarta-SemiBold" },
+    inputIcon: { width: 20, height: 20, marginRight: 10, opacity: 0.6 },
+    input: { flex: 1, fontSize: 16, fontFamily: "Jakarta-Medium", paddingVertical: 0 },
+    hint: { fontSize: 12, fontFamily: "Jakarta-Medium", marginTop: 6 },
+    errorBox: {
+      borderWidth: 1,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      marginBottom: 12,
     },
-    successSubtitle: {
-      fontSize: 16,
-      fontFamily: "Jakarta-Medium",
-      textAlign: "center",
-      marginTop: 8,
+    errorText: { fontSize: 13, fontFamily: "Jakarta-Medium" },
+    linkRow: {
+      flexDirection: "row",
+      justifyContent: "center",
+      alignItems: "center",
+      flexWrap: "wrap",
+      marginTop: 28,
     },
+    linkText: { fontSize: 15, fontFamily: "Jakarta-Medium" },
+    linkAccent: { fontSize: 15, fontFamily: "Jakarta-Bold" },
   });
 }
 

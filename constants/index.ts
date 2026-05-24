@@ -31,6 +31,7 @@ import onboarding1 from "@/assets/images/onboarding1.png";
 import onboarding2 from "@/assets/images/onboarding2.png";
 import onboarding3 from "@/assets/images/onboarding3.png";
 import signUpCar from "@/assets/images/signup-car.png";
+import bythronLogo from "@/assets/images/bythron_logo.png";
 
 export const images = {
   onboarding1,
@@ -41,6 +42,7 @@ export const images = {
   check,
   noResult,
   message,
+  bythronLogo,
 };
 
 export const icons = {
@@ -74,21 +76,21 @@ export const icons = {
 export const onboarding = [
   {
     id: 1,
-    title: "The perfect ride is just a tap away!",
+    title: "Real-time tracking at your fingertips!",
     description:
-      "Your journey begins with Ryde. Find your ideal ride effortlessly.",
+      "Your journey begins with Track IQ. Monitor your assets effortlessly.",
     image: images.onboarding1,
   },
   {
     id: 2,
-    title: "Best car in your hands with Ryde",
+    title: "Complete control in your hands with Track IQ",
     description:
-      "Discover the convenience of finding your perfect ride with Ryde",
+      "Discover the convenience of real-time GPS tracking with Track IQ",
     image: images.onboarding2,
   },
   {
     id: 3,
-    title: "Your ride, your way. Let's go!",
+    title: "Your assets, your way. Let's go!",
     description:
       "Enter your destination, sit back, and let us take care of the rest.",
     image: images.onboarding3,
