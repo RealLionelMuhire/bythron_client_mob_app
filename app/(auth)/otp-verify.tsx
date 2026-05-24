@@ -9,7 +9,7 @@
  */
 
 import { useSignUp } from "@clerk/clerk-expo";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   KeyboardAvoidingView,
@@ -26,12 +26,15 @@ import { useColorScheme } from "nativewind";
 
 import CustomButton from "@/components/CustomButton";
 import { getThemeColors } from "@/constants/theme";
-import { getSignupPhone, setOnboardingStep } from "@/lib/onboarding";
+import { setOnboardingStep } from "@/lib/onboarding";
 
 const RESEND_TIMEOUT = 30; // seconds
 
 export default function OtpVerify() {
   const { isLoaded, signUp, setActive } = useSignUp();
+  const params = useLocalSearchParams();
+  const verifyType = (params.type as string) || "email";
+
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === "dark";
   const colors = getThemeColors(isDark ? "dark" : "light");
@@ -42,14 +45,8 @@ export default function OtpVerify() {
   const [error, setError]           = useState<string | null>(null);
   const [canResend, setCanResend]   = useState(false);
   const [timer, setTimer]           = useState(RESEND_TIMEOUT);
-  const [phone, setPhone]           = useState<string | null>(null);
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // Load the phone number saved during sign-up
-  useEffect(() => {
-    getSignupPhone().then(setPhone);
-  }, []);
 
   // Countdown timer
   useEffect(() => {
@@ -80,9 +77,7 @@ export default function OtpVerify() {
     setError(null);
 
     try {
-      const result = await signUp!.attemptPhoneNumberVerification({
-        code: otpCode,
-      });
+      const result = await signUp!.attemptEmailAddressVerification({ code: otpCode });
 
       if (result.status === "complete") {
         // Activate the session
@@ -107,7 +102,7 @@ export default function OtpVerify() {
   const onResend = async () => {
     if (!isLoaded) return;
     try {
-      await signUp!.preparePhoneNumberVerification({ strategy: "phone_code" });
+      await signUp!.prepareEmailAddressVerification({ strategy: "email_code" });
       setError(null);
       setOtpCode("");
       startCountdown();
@@ -139,15 +134,15 @@ export default function OtpVerify() {
           {/* Header */}
           <View style={styles.headerBlock}>
             <View style={[styles.iconCircle, { backgroundColor: colors.accent[500] + "18" }]}>
-              <Text style={styles.iconEmoji}>📱</Text>
+              <Text style={styles.iconEmoji}>✉️</Text>
             </View>
             <Text style={[styles.title, { color: colors.text.primary }]}>
-              Verify your number
+              Verify your email
             </Text>
             <Text style={[styles.subtitle, { color: colors.text.muted }]}>
               Enter the 6-digit code sent to{"\n"}
               <Text style={{ color: colors.accent[500], fontFamily: "Jakarta-SemiBold" }}>
-                {phone ?? "your phone"}
+                your email
               </Text>
             </Text>
           </View>
