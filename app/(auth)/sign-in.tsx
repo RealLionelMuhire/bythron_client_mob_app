@@ -36,6 +36,8 @@ const SignIn = () => {
 
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [focused, setFocused] = useState<string | null>(null);
@@ -155,7 +157,7 @@ const SignIn = () => {
                   style={[styles.input, { color: colors.text.primary }]}
                   placeholder="••••••••"
                   placeholderTextColor={colors.text.muted}
-                  secureTextEntry
+                  secureTextEntry={!showPassword}
                   value={password}
                   onChangeText={(v) => { setPassword(v); setError(null); }}
                   onFocus={() => setFocused("password")}
@@ -163,11 +165,27 @@ const SignIn = () => {
                   returnKeyType="done"
                   onSubmitEditing={onSignIn}
                 />
+                <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeBtn}>
+                  <Text style={{ fontSize: 18, color: colors.text.muted }}>{showPassword ? "👁️" : "🙈"}</Text>
+                </TouchableOpacity>
               </View>
               
-              <TouchableOpacity onPress={() => router.push("/(auth)/forgot-password" as any)} style={styles.forgotPassword}>
-                <Text style={[styles.forgotText, { color: colors.accent[500] }]}>Forgot Password?</Text>
-              </TouchableOpacity>
+              <View style={styles.optionsRow}>
+                <TouchableOpacity 
+                  style={styles.checkboxWrap} 
+                  onPress={() => setRememberMe(!rememberMe)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.checkbox, rememberMe && { backgroundColor: colors.accent[500], borderColor: colors.accent[500] }]}>
+                    {rememberMe && <Text style={styles.checkmark}>✓</Text>}
+                  </View>
+                  <Text style={[styles.rememberText, { color: colors.text.secondary }]}>Stay logged in</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity onPress={() => router.push("/(auth)/forgot-password" as any)}>
+                  <Text style={[styles.forgotText, { color: colors.accent[500] }]}>Forgot Password?</Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
             {error ? (
@@ -207,13 +225,18 @@ function createStyles(colors: ReturnType<typeof getThemeColors>, isDark: boolean
     label: { fontSize: 13, fontFamily: "Jakarta-SemiBold", marginBottom: 8, letterSpacing: 0.3, textTransform: "uppercase" },
     inputRow: { flexDirection: "row", alignItems: "center", borderWidth: 1.5, borderRadius: 14, paddingHorizontal: 14, height: 54 },
     input: { flex: 1, fontSize: 16, fontFamily: "Jakarta-Medium", paddingVertical: 0 },
+    eyeBtn: { padding: 8, marginRight: -8 },
     errorBox: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 4 },
     errorText: { fontSize: 13, fontFamily: "Jakarta-Medium" },
+    optionsRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 12 },
+    checkboxWrap: { flexDirection: "row", alignItems: "center" },
+    checkbox: { width: 18, height: 18, borderRadius: 4, borderWidth: 1.5, borderColor: colors.surface.border, alignItems: "center", justifyContent: "center", marginRight: 8 },
+    checkmark: { color: "#fff", fontSize: 12, fontWeight: "bold" },
+    rememberText: { fontSize: 14, fontFamily: "Jakarta-Medium" },
+    forgotText: { fontSize: 14, fontFamily: "Jakarta-SemiBold" },
     linkRow: { flexDirection: "row", justifyContent: "center", alignItems: "center", flexWrap: "wrap", marginTop: 28 },
     linkText: { fontSize: 15, fontFamily: "Jakarta-Medium" },
     linkAccent: { fontSize: 15, fontFamily: "Jakarta-Bold" },
-    forgotPassword: { alignItems: "flex-end", marginTop: 8 },
-    forgotText: { fontSize: 14, fontFamily: "Jakarta-SemiBold" },
   });
 }
 

@@ -35,7 +35,9 @@ const SignUp = () => {
   const colors = getThemeColors(isDark ? "dark" : "light");
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
 
-  const [form, setForm] = useState({ firstName: "", lastName: "", email: "", password: "" });
+  const [form, setForm] = useState({ firstName: "", lastName: "", email: "", password: "", confirmPassword: "" });
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [focusedField, setFocusedField] = useState<string | null>(null);
@@ -51,11 +53,23 @@ const SignUp = () => {
     const lastName = form.lastName.trim();
     const email = form.email.trim();
     const password = form.password;
+    const confirmPassword = form.confirmPassword;
 
     if (!firstName) return setError("Please enter your first name.");
     if (!lastName) return setError("Please enter your last name.");
     if (!email) return setError("Please enter your email.");
-    if (!password || password.length < 8) return setError("Password must be at least 8 characters.");
+    
+    // Strong password validation
+    const hasUpperCase = /[A-Z]/.test(password);
+    const hasNumber = /[0-9]/.test(password);
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+
+    if (password.length < 8) return setError("Password must be at least 8 characters.");
+    if (!hasUpperCase) return setError("Password must contain at least one uppercase letter.");
+    if (!hasNumber) return setError("Password must contain at least one number.");
+    if (!hasSpecialChar) return setError("Password must contain at least one special character.");
+
+    if (password !== confirmPassword) return setError("Passwords do not match.");
 
     setIsLoading(true);
     setError(null);
@@ -182,14 +196,38 @@ const SignUp = () => {
                   style={[styles.input, { color: colors.text.primary }]}
                   placeholder="••••••••"
                   placeholderTextColor={colors.text.muted}
-                  secureTextEntry
+                  secureTextEntry={!showPassword}
                   value={form.password}
                   onChangeText={(v) => setForm({ ...form, password: v })}
                   onFocus={() => setFocusedField("password")}
                   onBlur={() => setFocusedField(null)}
+                  returnKeyType="next"
+                />
+                <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeBtn}>
+                  <Text style={{ fontSize: 18, color: colors.text.muted }}>{showPassword ? "👁️" : "🙈"}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Confirm Password */}
+            <View style={styles.fieldWrap}>
+              <Text style={[styles.label, { color: colors.text.secondary }]}>Confirm Password</Text>
+              <View style={[styles.inputRow, { backgroundColor: isDark ? colors.surface.card : "#F0F6FF", borderColor: focusedField === "confirmPassword" ? colors.accent[500] : colors.surface.border }]}>
+                <TextInput
+                  style={[styles.input, { color: colors.text.primary }]}
+                  placeholder="••••••••"
+                  placeholderTextColor={colors.text.muted}
+                  secureTextEntry={!showConfirmPassword}
+                  value={form.confirmPassword}
+                  onChangeText={(v) => setForm({ ...form, confirmPassword: v })}
+                  onFocus={() => setFocusedField("confirmPassword")}
+                  onBlur={() => setFocusedField(null)}
                   returnKeyType="done"
                   onSubmitEditing={onContinue}
                 />
+                <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.eyeBtn}>
+                  <Text style={{ fontSize: 18, color: colors.text.muted }}>{showConfirmPassword ? "👁️" : "🙈"}</Text>
+                </TouchableOpacity>
               </View>
             </View>
 
@@ -231,6 +269,7 @@ function createStyles(colors: ReturnType<typeof getThemeColors>, isDark: boolean
     inputRow: { flexDirection: "row", alignItems: "center", borderWidth: 1.5, borderRadius: 14, paddingHorizontal: 14, height: 54 },
     inputIcon: { width: 20, height: 20, marginRight: 10, opacity: 0.6 },
     input: { flex: 1, fontSize: 16, fontFamily: "Jakarta-Medium", paddingVertical: 0 },
+    eyeBtn: { padding: 8, marginRight: -8 },
     errorBox: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 12 },
     errorText: { fontSize: 13, fontFamily: "Jakarta-Medium" },
     linkRow: { flexDirection: "row", justifyContent: "center", alignItems: "center", flexWrap: "wrap", marginTop: 28 },

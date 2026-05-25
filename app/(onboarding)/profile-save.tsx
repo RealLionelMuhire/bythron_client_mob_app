@@ -51,14 +51,9 @@ export default function ProfileSave() {
 
     try {
       const token = await getToken();
-      const safeName =
-        user!.fullName ||
-        [user!.firstName, user!.lastName].filter(Boolean).join(" ") ||
-        user!.primaryEmailAddress?.emailAddress?.split("@")[0] ||
-        user!.primaryPhoneNumber?.phoneNumber?.split("@")[0] ||
-        "Unknown";
-      const phone = user!.primaryPhoneNumber?.phoneNumber ?? "";
-      const email = user!.primaryEmailAddress?.emailAddress ?? null;
+      const firstName = user!.firstName || "Unknown";
+      const lastName = user!.lastName || "Unknown";
+      const email = user!.primaryEmailAddress?.emailAddress ?? "";
 
       await fetchAPI("/api/users", {
         method: "POST",
@@ -68,8 +63,8 @@ export default function ProfileSave() {
         },
         body: JSON.stringify({
           clerkUserId: user!.id,
-          name: safeName,
-          phone,
+          firstName,
+          lastName,
           email,
           role: "owner",
         }),
