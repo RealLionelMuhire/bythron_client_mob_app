@@ -18,6 +18,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useColorScheme } from "nativewind";
 
@@ -136,7 +137,7 @@ const SignUp = () => {
                 <View style={[styles.inputRow, { backgroundColor: isDark ? colors.surface.card : "#F0F6FF", borderColor: focusedField === "firstName" ? colors.accent[500] : colors.surface.border }]}>
                   <TextInput
                     style={[styles.input, { color: colors.text.primary }]}
-                    placeholder="John"
+                    placeholder="e.g. Alex"
                     placeholderTextColor={colors.text.muted}
                     textContentType="givenName"
                     autoCapitalize="words"
@@ -155,7 +156,7 @@ const SignUp = () => {
                 <View style={[styles.inputRow, { backgroundColor: isDark ? colors.surface.card : "#F0F6FF", borderColor: focusedField === "lastName" ? colors.accent[500] : colors.surface.border }]}>
                   <TextInput
                     style={[styles.input, { color: colors.text.primary }]}
-                    placeholder="Doe"
+                    placeholder="e.g. Smith"
                     placeholderTextColor={colors.text.muted}
                     textContentType="familyName"
                     autoCapitalize="words"
@@ -204,7 +205,7 @@ const SignUp = () => {
                   returnKeyType="next"
                 />
                 <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeBtn}>
-                  <Text style={{ fontSize: 18, color: colors.text.muted }}>{showPassword ? "👁️" : "🙈"}</Text>
+                  <Ionicons name={showPassword ? "eye-outline" : "eye-off-outline"} size={22} color={colors.text.muted} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -226,7 +227,7 @@ const SignUp = () => {
                   onSubmitEditing={onContinue}
                 />
                 <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.eyeBtn}>
-                  <Text style={{ fontSize: 18, color: colors.text.muted }}>{showConfirmPassword ? "👁️" : "🙈"}</Text>
+                  <Ionicons name={showConfirmPassword ? "eye-outline" : "eye-off-outline"} size={22} color={colors.text.muted} />
                 </TouchableOpacity>
               </View>
             </View>

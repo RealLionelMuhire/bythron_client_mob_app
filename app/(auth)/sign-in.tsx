@@ -18,13 +18,15 @@ import {
   View,
   Image,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useColorScheme } from "nativewind";
 
 import CustomButton from "@/components/CustomButton";
 import { getThemeColors } from "@/constants/theme";
 import { icons, images } from "@/constants";
-import { isOnboardingComplete, getOnboardingStep, stepToRoute } from "@/lib/onboarding";
+import { fetchAPI } from "@/lib/fetch";
+import { isOnboardingComplete, getOnboardingStep, stepToRoute, setOnboardingComplete, setOnboardingStep } from "@/lib/onboarding";
 
 const SignIn = () => {
   const { signIn, setActive, isLoaded } = useSignIn();
@@ -71,6 +73,20 @@ const SignIn = () => {
       if (result.status === "complete") {
         await setActive({ session: result.createdSessionId });
 
+        // Sync onboarding state from backend to ensure we don't prompt for plan
+        // if they already chose one on another device or previously.
+        try {
+          const userProfile = await fetchAPI("/api/auth/me");
+          if (userProfile && typeof userProfile.onboarding_complete !== "undefined") {
+            await setOnboardingComplete(userProfile.onboarding_complete);
+            if (userProfile.onboarding_step) {
+              await setOnboardingStep(userProfile.onboarding_step);
+            }
+          }
+        } catch (err) {
+          console.warn("Failed to sync onboarding state on sign in:", err);
+        }
+
         // Route based on onboarding state
         const done = await isOnboardingComplete();
         const step = await getOnboardingStep();
@@ -109,7 +125,7 @@ const SignIn = () => {
 
           {/* ── Welcome Block ── */}
           <View style={styles.welcomeBlock}>
-            <Text style={[styles.welcomeTitle, { color: colors.text.primary }]}>Welcome back 👋</Text>
+            <Text style={[styles.welcomeTitle, { color: colors.text.primary }]}>Welcome back</Text>
             <Text style={[styles.welcomeSub, { color: colors.text.muted }]}>Sign in to your account</Text>
           </View>
 
@@ -166,7 +182,7 @@ const SignIn = () => {
                   onSubmitEditing={onSignIn}
                 />
                 <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeBtn}>
-                  <Text style={{ fontSize: 18, color: colors.text.muted }}>{showPassword ? "👁️" : "🙈"}</Text>
+                  <Ionicons name={showPassword ? "eye-outline" : "eye-off-outline"} size={22} color={colors.text.muted} />
                 </TouchableOpacity>
               </View>
               
