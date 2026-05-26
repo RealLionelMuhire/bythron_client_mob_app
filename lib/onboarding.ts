@@ -14,13 +14,11 @@
 
 import * as SecureStore from "expo-secure-store";
 
-const KEY_STEP     = "onboarding_step";
-const KEY_DONE     = "onboarding_complete";
-const KEY_IMEI     = "paired_imei";
-const KEY_PHONE    = "signup_phone";
-const KEY_NAME     = "signup_name";
-const KEY_PLAN     = "current_plan";
-const KEY_EXPIRY   = "plan_expires_at";
+const KEY_STEP = "onboarding_step";
+const KEY_DONE = "onboarding_complete";
+const KEY_IMEI = "paired_imei";
+const KEY_PHONE = "signup_phone";
+const KEY_NAME = "signup_name";
 
 // ── Step ──────────────────────────────────────────────────────────────────
 
@@ -36,7 +34,7 @@ export async function getOnboardingStep(): Promise<number> {
 export async function setOnboardingStep(step: number): Promise<void> {
   try {
     await SecureStore.setItemAsync(KEY_STEP, String(step));
-  } catch {}
+  } catch { }
 }
 
 // ── Complete flag ─────────────────────────────────────────────────────────
@@ -53,7 +51,7 @@ export async function isOnboardingComplete(): Promise<boolean> {
 export async function setOnboardingComplete(done: boolean): Promise<void> {
   try {
     await SecureStore.setItemAsync(KEY_DONE, done ? "true" : "false");
-  } catch {}
+  } catch { }
 }
 
 // ── Paired IMEI ───────────────────────────────────────────────────────────
@@ -69,7 +67,7 @@ export async function getPairedImei(): Promise<string | null> {
 export async function setPairedImei(imei: string): Promise<void> {
   try {
     await SecureStore.setItemAsync(KEY_IMEI, imei);
-  } catch {}
+  } catch { }
 }
 
 // ── Temp sign-up data (passed between sign-up → otp screens) ─────────────
@@ -85,7 +83,7 @@ export async function getSignupPhone(): Promise<string | null> {
 export async function setSignupPhone(phone: string): Promise<void> {
   try {
     await SecureStore.setItemAsync(KEY_PHONE, phone);
-  } catch {}
+  } catch { }
 }
 
 export async function getSignupName(): Promise<string | null> {
@@ -99,37 +97,7 @@ export async function getSignupName(): Promise<string | null> {
 export async function setSignupName(name: string): Promise<void> {
   try {
     await SecureStore.setItemAsync(KEY_NAME, name);
-  } catch {}
-}
-
-// ── Plan Info ─────────────────────────────────────────────────────────────
-
-export async function getCurrentPlan(): Promise<string | null> {
-  try {
-    return await SecureStore.getItemAsync(KEY_PLAN);
-  } catch {
-    return null;
-  }
-}
-
-export async function setCurrentPlan(planId: string): Promise<void> {
-  try {
-    await SecureStore.setItemAsync(KEY_PLAN, planId);
-  } catch {}
-}
-
-export async function getPlanExpiresAt(): Promise<string | null> {
-  try {
-    return await SecureStore.getItemAsync(KEY_EXPIRY);
-  } catch {
-    return null;
-  }
-}
-
-export async function setPlanExpiresAt(dateStr: string): Promise<void> {
-  try {
-    await SecureStore.setItemAsync(KEY_EXPIRY, dateStr);
-  } catch {}
+  } catch { }
 }
 
 // ── Full reset (on sign-out) ──────────────────────────────────────────────
@@ -141,9 +109,7 @@ export async function clearOnboardingState(): Promise<void> {
     await SecureStore.deleteItemAsync(KEY_IMEI);
     await SecureStore.deleteItemAsync(KEY_PHONE);
     await SecureStore.deleteItemAsync(KEY_NAME);
-    await SecureStore.deleteItemAsync(KEY_PLAN);
-    await SecureStore.deleteItemAsync(KEY_EXPIRY);
-  } catch {}
+  } catch { }
 }
 
 // ── Route helper ──────────────────────────────────────────────────────────
