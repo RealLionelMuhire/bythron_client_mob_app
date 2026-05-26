@@ -26,7 +26,7 @@ import CustomButton from "@/components/CustomButton";
 import { getThemeColors } from "@/constants/theme";
 import { icons, images } from "@/constants";
 import { fetchAPI } from "@/lib/fetch";
-import { isOnboardingComplete, getOnboardingStep, stepToRoute, setOnboardingComplete, setOnboardingStep } from "@/lib/onboarding";
+import { isOnboardingComplete, getOnboardingStep, stepToRoute, setOnboardingComplete, setOnboardingStep, setCurrentPlan, setPlanExpiresAt } from "@/lib/onboarding";
 
 const SignIn = () => {
   const { signIn, setActive, isLoaded } = useSignIn();
@@ -77,20 +77,37 @@ const SignIn = () => {
         // if they already chose one on another device or previously.
         try {
           const userProfile = await fetchAPI("/api/auth/me");
-          if (userProfile && typeof userProfile.onboarding_complete !== "undefined") {
-            await setOnboardingComplete(userProfile.onboarding_complete);
-            if (userProfile.onboarding_step) {
-              await setOnboardingStep(userProfile.onboarding_step);
+          if (userProfile) {
+            // Trust server's complete flag
+            if (userProfile.onboarding_complete) {
+              await setOnboardingComplete(true);
             }
+            // Only advance step, don't regress
+            const serverStep = userProfile.onboarding_step ?? 0;
+            const localStep = await getOnboardingStep();
+            if (serverStep > localStep) {
+              await setOnboardingStep(serverStep);
+            }
+          }
+
+          // Fetch billing to sync current plan
+          const billingInfo = await fetchAPI("/api/billing");
+          if (billingInfo && billingInfo.currentPlan) {
+            await setCurrentPlan(billingInfo.currentPlan);
+            if (billingInfo.expiresAt) {
+              await setPlanExpiresAt(billingInfo.expiresAt);
+            }
+            // If they have a plan that isn't the default null state, they're done with onboarding
+            await setOnboardingComplete(true);
           }
         } catch (err) {
           console.warn("Failed to sync onboarding state on sign in:", err);
         }
 
-        // Route based on onboarding state
+        // Route based on the freshly synced state
         const done = await isOnboardingComplete();
         const step = await getOnboardingStep();
-        if (done) {
+        if (done || step >= 8) {
           router.replace("/(root)/(tabs)/home");
         } else {
           router.replace(stepToRoute(step) as any);
