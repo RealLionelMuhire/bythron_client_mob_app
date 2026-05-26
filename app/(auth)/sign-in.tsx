@@ -26,7 +26,7 @@ import CustomButton from "@/components/CustomButton";
 import { getThemeColors } from "@/constants/theme";
 import { icons, images } from "@/constants";
 import { fetchAPI } from "@/lib/fetch";
-import { isOnboardingComplete, getOnboardingStep, stepToRoute, setOnboardingComplete, setOnboardingStep } from "@/lib/onboarding";
+import { isOnboardingComplete, getOnboardingStep, stepToRoute, setOnboardingComplete, setOnboardingStep, setCurrentPlan, setPlanExpiresAt } from "@/lib/onboarding";
 
 const SignIn = () => {
   const { signIn, setActive, isLoaded } = useSignIn();
@@ -81,6 +81,13 @@ const SignIn = () => {
             await setOnboardingComplete(userProfile.onboarding_complete);
             if (userProfile.onboarding_step) {
               await setOnboardingStep(userProfile.onboarding_step);
+            }
+          }
+          const billingInfo = await fetchAPI("/api/billing");
+          if (billingInfo && billingInfo.currentPlan) {
+            await setCurrentPlan(billingInfo.currentPlan);
+            if (billingInfo.expiresAt) {
+              await setPlanExpiresAt(billingInfo.expiresAt);
             }
           }
         } catch (err) {

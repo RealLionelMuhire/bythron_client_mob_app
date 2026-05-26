@@ -31,57 +31,13 @@ import type { RedirectParams } from "flutterwave-react-native/dist/PayWithFlutte
 import CustomButton from "@/components/CustomButton";
 import { getThemeColors } from "@/constants/theme";
 import { fetchAPI } from "@/lib/fetch";
-import { setOnboardingComplete, setOnboardingStep } from "@/lib/onboarding";
+import { setOnboardingComplete, setOnboardingStep, setCurrentPlan, setPlanExpiresAt } from "@/lib/onboarding";
+import { PLANS, PlanId, getPlan } from "@/constants/plans";
+import FlutterwavePayment from "@/components/FlutterwavePayment";
 
-// ── Constants ─────────────────────────────────────────────────────────────
-
-type PlanId = "trial" | "basic" | "fleet";
-
-const PLAN_PRICES: Record<PlanId, number> = {
-  trial: 0,
-  basic: 5000,
-  fleet: 15000,
-};
-
-interface Plan {
-  id: PlanId;
-  name: string;
-  price: number;
-  period?: string;
-  days?: number;
-  features: string[];
-  badge?: string;
-}
-
-const PLANS: Plan[] = [
-  {
-    id: "trial",
-    name: "Free Trial",
-    price: 0,
-    days: 14,
-    features: ["1 vehicle", "Basic tracking", "No credit card required"],
-    badge: "Start free",
-  },
-  {
-    id: "basic",
-    name: "Basic",
-    price: 5000,
-    period: "month",
-    features: ["Up to 3 vehicles", "Real-time alerts", "Email support"],
-    badge: "Popular",
-  },
-  {
-    id: "fleet",
-    name: "Fleet",
-    price: 15000,
-    period: "month",
-    features: ["Unlimited vehicles", "Advanced reports", "Priority support"],
-  },
-];
-
-function formatPrice(plan: Plan): string {
+function formatPrice(plan: any): string {
   if (plan.price === 0) return "Free";
-  return `RWF ${plan.price.toLocaleString()} / ${plan.period}`;
+  return `RWF ${plan.price.toLocaleString()} / month`;
 }
 
 // ── Component ──────────────────────────────────────────────────────────────
@@ -105,7 +61,7 @@ export default function PlanScreen() {
   const activateSubscription = async (planId: PlanId) => {
     try {
       const token = await getToken();
-      await fetchAPI("/api/subscriptions", {
+      const res = await fetchAPI("/api/subscriptions", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -116,6 +72,10 @@ export default function PlanScreen() {
 
       await setOnboardingStep(9);
       await setOnboardingComplete(true);
+      await setCurrentPlan(planId);
+      if (res?.expiresAt) {
+        await setPlanExpiresAt(res.expiresAt);
+      }
       router.replace("/(root)/(tabs)/home");
     } catch (err: any) {
       setError(err.message ?? "Could not activate subscription. Please contact support.");
@@ -166,31 +126,7 @@ export default function PlanScreen() {
     // Loading spinner stays until Flutterwave result comes back via onRedirect
   };
 
-  // ── Flutterwave redirect handler ─────────────────────────────────────────
-
-  const onFlutterwaveRedirect = async (data: RedirectParams) => {
-    setShowFlutterwave(false);
-
-    if (data.status === "successful" && data.transaction_id) {
-      const txRef = data.tx_ref;
-      await verifyPaymentAndActivate(txRef, pendingPlanRef.current);
-    } else if (data.status === "cancelled") {
-      setError("Payment cancelled.");
-      setIsLoading(false);
-    } else {
-      setError("Payment failed. Please try again.");
-      setIsLoading(false);
-    }
-  };
-
   // ── Derived Flutterwave config ────────────────────────────────────────────
-
-  const flwPublicKey = process.env.EXPO_PUBLIC_FLUTTERWAVE_PUBLIC_KEY ?? "";
-  const txRef = `gps-${user?.id ?? "u"}-${Date.now()}`;
-  const userPhone = user?.primaryPhoneNumber?.phoneNumber ?? "";
-  const userName  = user?.fullName ?? user?.firstName ?? "Customer";
-  // Flutterwave requires a valid email — synthesise one from phone
-  const userEmail = `${(userPhone.replace(/\+/g, "") || "user")}@gps.trackiq.app`;
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.surface.light }]}>
@@ -233,9 +169,9 @@ export default function PlanScreen() {
                 <View>
                   <Text style={[styles.planName,  { color: colors.text.primary }]}>{plan.name}</Text>
                   <Text style={[styles.planPrice, { color: colors.accent[500] }]}>{formatPrice(plan)}</Text>
-                  {plan.days && (
+                  {plan.duration && plan.price === 0 && (
                     <Text style={[styles.planPeriodNote, { color: colors.text.muted }]}>
-                      {plan.days}-day trial
+                      {plan.duration}-day trial
                     </Text>
                   )}
                 </View>
@@ -276,49 +212,27 @@ export default function PlanScreen() {
           </View>
         ) : null}
 
-        {/*
-          PayWithFlutterwave renders an invisible button we control programmatically.
-          We show it only when showFlutterwave is true, which immediately triggers
-          the payment sheet via its auto-initialization behaviour.
-        */}
-        {showFlutterwave && flwPublicKey ? (
-          <PayWithFlutterwave
-            onRedirect={onFlutterwaveRedirect}
-            onAbort={() => {
-              setShowFlutterwave(false);
-              setError("Payment cancelled.");
-              setIsLoading(false);
-            }}
-            options={{
-              tx_ref:         txRef,
-              authorization:  flwPublicKey,
-              customer: {
-                email:       userEmail,
-                phonenumber: userPhone,
-                name:        userName,
-              },
-              amount:          PLAN_PRICES[selectedPlan],
-              currency:        "RWF",
-              payment_options: "mobilemoney,card",
-              meta: [{ metaname: "planId", metavalue: selectedPlan }],
-            }}
-            customButton={({ disabled, onPress }) => {
-              // Auto-open the payment sheet as soon as the SDK is ready
-              if (!disabled) {
-                // Call on next tick to avoid calling during render
-                setTimeout(onPress, 0);
-              }
-              return (
-                <View style={[styles.fwLoadingBox, { borderColor: colors.surface.border }]}>
-                  <ActivityIndicator color={colors.accent[500]} />
-                  <Text style={[styles.fwLoadingText, { color: colors.text.muted }]}>
-                    {disabled ? "Initializing payment…" : "Opening payment sheet…"}
-                  </Text>
-                </View>
-              );
-            }}
-          />
-        ) : (
+        <FlutterwavePayment
+          isVisible={showFlutterwave}
+          planId={pendingPlanRef.current}
+          amount={getPlan(pendingPlanRef.current).price}
+          onSuccess={async (txRef) => {
+            setShowFlutterwave(false);
+            await verifyPaymentAndActivate(txRef, pendingPlanRef.current);
+          }}
+          onFail={(msg) => {
+            setShowFlutterwave(false);
+            setError(msg);
+            setIsLoading(false);
+          }}
+          onCancel={() => {
+            setShowFlutterwave(false);
+            setError("Payment cancelled.");
+            setIsLoading(false);
+          }}
+        />
+
+        {!showFlutterwave && (
           <CustomButton
             title={isLoading ? "Activating…" : selectedPlan === "trial" ? "Start free trial" : "Pay & Continue"}
             onPress={onContinue}

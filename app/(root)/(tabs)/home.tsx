@@ -13,7 +13,6 @@ import {
   RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 
 import { useColorScheme } from "nativewind";
@@ -21,6 +20,11 @@ import { icons } from "@/constants";
 import { getThemeColors } from "@/constants/theme";
 import { useLocationStore, useDeviceStore, useUserStore } from "@/store";
 import { refreshDevices } from "@/lib/deviceService";
+import { getCurrentPlan, getPlanExpiresAt } from "@/lib/onboarding";
+import { getPlan, PlanId } from "@/constants/plans";
+import SideMenu from "@/components/SideMenu";
+import UpgradeSheet from "@/components/UpgradeSheet";
+import BillingSheet from "@/components/BillingSheet";
 
 const { width } = Dimensions.get("window");
 
@@ -37,9 +41,32 @@ const Home = () => {
   const setUserLocation = useLocationStore((s) => s.setUserLocation);
   const devices = useDeviceStore((s) => s.devices);
   const devicesReady = useDeviceStore((s) => s.devicesReady);
-  // Note: device fetch and user sync now run in (root)/_layout.tsx
 
   const [refreshing, setRefreshing] = useState(false);
+  
+  // Plan State
+  const [currentPlan, setCurrentPlanState] = useState<string>("trial");
+  const [expiresAt, setExpiresAtState] = useState<string | null>(null);
+  const [showUpgrade, setShowUpgrade] = useState(false);
+  const [showBilling, setShowBilling] = useState(false);
+  const [showSideMenu, setShowSideMenu] = useState(false);
+
+  const loadPlanInfo = async () => {
+    const p = await getCurrentPlan();
+    const e = await getPlanExpiresAt();
+    setCurrentPlanState(p || "trial");
+    setExpiresAtState(e);
+  };
+
+  useEffect(() => {
+    loadPlanInfo();
+  }, []);
+
+  const daysLeft = useMemo(() => {
+    if (!expiresAt) return 0;
+    const diff = new Date(expiresAt).getTime() - Date.now();
+    return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+  }, [expiresAt]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -108,7 +135,7 @@ const Home = () => {
       <View className={`pt-10 ${isDark ? "bg-slate-800" : "bg-accent-200"}`}>
         <View className="px-5 py-2">
           <View className="flex-row justify-between items-center">
-            <TouchableOpacity className="p-2">
+            <TouchableOpacity className="p-2" onPress={() => setShowSideMenu(true)}>
               <Ionicons name="menu" size={28} color={colors.text.primary} />
             </TouchableOpacity>
             <Text className={`text-xl font-JakartaBold ${isDark ? "text-slate-100" : "text-slate-900"}`}>Dashboard</Text>
@@ -163,6 +190,50 @@ const Home = () => {
                 </TouchableOpacity>
               </View>
             </View>
+          </View>
+        </View>
+
+        {/* Plan Status Banner */}
+        <View className="px-5 mt-2 mb-4">
+          <View style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: 14,
+            borderRadius: 12,
+            backgroundColor: currentPlan === "trial" 
+              ? (daysLeft <= 3 ? colors.status.error + "15" : colors.accent[500] + "15")
+              : (daysLeft <= 0 ? colors.status.error + "15" : colors.status.success + "15"),
+            borderWidth: 1,
+            borderColor: currentPlan === "trial" 
+              ? (daysLeft <= 3 ? colors.status.error : colors.accent[500])
+              : (daysLeft <= 0 ? colors.status.error : colors.status.success)
+          }}>
+            <View style={{ flex: 1, marginRight: 10 }}>
+              <Text style={{ fontFamily: "Jakarta-Bold", fontSize: 14, color: isDark ? "#fff" : "#000" }}>
+                {currentPlan === "trial" ? "Free Trial" : `${getPlan(currentPlan as PlanId).name} Plan`}
+              </Text>
+              <Text style={{ fontFamily: "Jakarta-Medium", fontSize: 12, color: colors.text.secondary, marginTop: 2 }}>
+                {daysLeft <= 0 
+                  ? "Plan expired" 
+                  : (currentPlan === "trial" 
+                      ? `${daysLeft} days remaining` 
+                      : `Renews in ${daysLeft} days`)}
+              </Text>
+            </View>
+            <TouchableOpacity 
+              onPress={() => setShowUpgrade(true)}
+              style={{
+                backgroundColor: daysLeft <= 3 || daysLeft <= 0 ? colors.status.error : colors.accent[500],
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+                borderRadius: 8
+              }}
+            >
+              <Text style={{ fontFamily: "Jakarta-Bold", fontSize: 13, color: "#fff" }}>
+                {daysLeft <= 0 ? "Renew Now" : currentPlan === "fleet" ? "Renew" : "Upgrade"}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -290,6 +361,28 @@ const Home = () => {
           <Text className={`text-xs font-JakartaMedium ${isDark ? "text-slate-500" : "text-status-muted"}`}>Disclaimer</Text>
         </View>
       </ScrollView>
+
+      {/* Modals & Bottom Sheets */}
+      <SideMenu 
+        isVisible={showSideMenu} 
+        onDismiss={() => setShowSideMenu(false)} 
+        onShowUpgrade={() => setShowUpgrade(true)} 
+        onShowBilling={() => setShowBilling(true)} 
+      />
+      
+      <UpgradeSheet 
+        isVisible={showUpgrade} 
+        currentPlan={currentPlan} 
+        onDismiss={() => setShowUpgrade(false)} 
+        onSuccess={() => {
+          loadPlanInfo();
+        }} 
+      />
+
+      <BillingSheet 
+        isVisible={showBilling} 
+        onDismiss={() => setShowBilling(false)} 
+      />
     </View>
   );
 };
