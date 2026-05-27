@@ -81,6 +81,7 @@ export default function PlanScreen() {
         body: JSON.stringify({ planId }),
       });
 
+      // Success — save and navigate
       await setOnboardingStep(9);
       await setOnboardingComplete(true);
       await setCurrentPlan(planId);
@@ -89,7 +90,18 @@ export default function PlanScreen() {
       }
       router.replace("/(root)/(tabs)/home");
     } catch (err: any) {
-      setError(err.message ?? "Could not activate subscription. Please contact support.");
+      const msg: string = err?.message ?? "";
+
+      // 409 = subscription already exists. Treat as success —
+      // the user has a plan, they just don't need another one.
+      if (msg.includes("409") || msg.toLowerCase().includes("already")) {
+        await setOnboardingComplete(true);
+        await setCurrentPlan(planId);
+        router.replace("/(root)/(tabs)/home");
+        return;
+      }
+
+      setError(msg || "Could not activate subscription. Please contact support.");
       setIsLoading(false);
     }
   };
