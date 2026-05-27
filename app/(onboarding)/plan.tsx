@@ -14,7 +14,7 @@
 
 import { useUser, useAuth } from "@clerk/clerk-expo";
 import { router } from "expo-router";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ScrollView,
   StyleSheet,
@@ -31,7 +31,7 @@ import type { RedirectParams } from "flutterwave-react-native/dist/PayWithFlutte
 import CustomButton from "@/components/CustomButton";
 import { getThemeColors } from "@/constants/theme";
 import { fetchAPI } from "@/lib/fetch";
-import { setOnboardingComplete, setOnboardingStep, setCurrentPlan, setPlanExpiresAt } from "@/lib/onboarding";
+import { setOnboardingComplete, setOnboardingStep, setCurrentPlan, setPlanExpiresAt, getCurrentPlan, isOnboardingComplete } from "@/lib/onboarding";
 import { PLANS, PlanId, getPlan } from "@/constants/plans";
 import FlutterwavePayment from "@/components/FlutterwavePayment";
 
@@ -55,6 +55,17 @@ export default function PlanScreen() {
   const [error, setError]                       = useState<string | null>(null);
   const [showFlutterwave, setShowFlutterwave]   = useState(false);
   const pendingPlanRef                          = useRef<PlanId>("trial");
+
+  // ── Guard: skip plan screen if user already has a plan ──────────────────
+  useEffect(() => {
+    (async () => {
+      const alreadyDone = await isOnboardingComplete();
+      const existingPlan = await getCurrentPlan();
+      if (alreadyDone || existingPlan) {
+        router.replace("/(root)/(tabs)/home");
+      }
+    })();
+  }, []);
 
   // ── Helpers ──────────────────────────────────────────────────────────────
 
