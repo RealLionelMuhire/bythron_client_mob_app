@@ -3,16 +3,15 @@
  *
  * App entry point — evaluates auth + onboarding state and routes accordingly.
  *
- * Decision tree:
- *   1. Clerk not yet loaded                         → null (splash stays)
- *   2. Not signed in                               → /sign-up
- *   3. Signed in → fetch /api/auth/me from server
- *      a. server says onboarding_complete = true   → /home (skip plan screen)
- *      b. server says onboarding_complete = false  → resume mid-flow
- *      c. server request fails                     → fall back to local SecureStore
- *
- * NOTE: We ALWAYS prefer the server's onboarding_complete flag over the local
- * SecureStore value. Local state is only the fallback for offline/first-boot.
+ * Decision tree (in priority order):
+ *   1. Clerk not loaded                                → null (splash)
+ *   2. Not signed in                                   → /sign-up
+ *   3. Signed in:
+ *      a. /api/auth/me  says onboarding_complete=true  → /home
+ *      b. /api/billing  has any active plan            → /home  ← KEY FALLBACK
+ *         (server DB may have stale onboarding_complete=false even with a sub)
+ *      c. Neither → resume onboarding at correct step
+ *      d. Server unreachable → fall back to local SecureStore
  */
 
 import { useAuth } from "@clerk/clerk-expo";
@@ -34,60 +33,68 @@ type RoutingState = "loading" | "home" | "onboarding";
 
 export default function Index() {
   const { isLoaded, isSignedIn, getToken } = useAuth();
-  const [state, setState] = useState<RoutingState>("loading");
+  const [state, setState]           = useState<RoutingState>("loading");
   const [resumeRoute, setResumeRoute] = useState<string>("/(onboarding)/plan");
 
   useEffect(() => {
     if (!isLoaded) return;
     if (!isSignedIn) {
-      setState("onboarding"); // will render sign-up redirect
+      setState("onboarding"); // will render /sign-up redirect below
       return;
     }
 
     (async () => {
       try {
-        // Register auth token getter early so fetchAPI can attach Bearer tokens
         setAuthTokenGetter(getToken);
 
-        // ── 1. Ask the server what the user's real state is ─────────────────
+        // ── Step 1: Check user profile ─────────────────────────────────────
         const userProfile = await fetchAPI("/api/auth/me");
 
         if (userProfile?.onboarding_complete === true) {
-          // Server says complete — write to local store and go home
           await setOnboardingComplete(true);
-          if (userProfile.onboarding_step) {
-            await setOnboardingStep(userProfile.onboarding_step);
-          }
-
-          // Also sync billing info so the home plan banner is accurate
+          if (userProfile.onboarding_step) await setOnboardingStep(userProfile.onboarding_step);
+          // Sync billing silently
           try {
             const billing = await fetchAPI("/api/billing");
             if (billing?.currentPlan) {
               await setCurrentPlan(billing.currentPlan);
               if (billing.expiresAt) await setPlanExpiresAt(billing.expiresAt);
             }
-          } catch {
-            // Non-fatal — plan banner will just show defaults
-          }
-
+          } catch { /* non-fatal */ }
           setState("home");
           return;
         }
 
-        // Server says NOT complete — figure out which step to resume at
+        // ── Step 2: Check billing (KEY FALLBACK) ───────────────────────────
+        // The server returns currentPlan='trial' as a DEFAULT even for users
+        // with NO subscription record. So we check expiresAt — it is only
+        // non-null when an actual subscription row exists in the database.
+        try {
+          const billing = await fetchAPI("/api/billing");
+          const hasRealSub = billing?.expiresAt != null; // null means no real sub
+          if (hasRealSub) {
+            await setOnboardingComplete(true);
+            await setCurrentPlan(billing.currentPlan);
+            await setPlanExpiresAt(billing.expiresAt);
+            setState("home");
+            return;
+          }
+        } catch { /* billing endpoint unavailable — continue to onboarding */ }
+
+        // ── Step 3: Resume mid-onboarding ──────────────────────────────────
         const serverStep: number = userProfile?.onboarding_step ?? 0;
         const localStep = await getOnboardingStep();
-        const step = Math.max(serverStep, localStep); // never go backwards
+        const step = Math.max(serverStep, localStep);
         await setOnboardingStep(step);
         await setOnboardingComplete(false);
         setResumeRoute(stepToRoute(step));
         setState("onboarding");
+
       } catch (err) {
-        // Network/auth error — fall back to local SecureStore
-        console.warn("[Index] Server sync failed, falling back to local state:", err);
+        // Network failure — fall back to local SecureStore
+        console.warn("[Index] Server unreachable, using local state:", err);
         const done = await isOnboardingComplete();
         const step = await getOnboardingStep();
-
         if (done || step >= 9) {
           setState("home");
         } else {
@@ -98,7 +105,7 @@ export default function Index() {
     })();
   }, [isLoaded, isSignedIn]);
 
-  // ── Render ──────────────────────────────────────────────────────────────────
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   if (!isLoaded || state === "loading") return null;
 

@@ -65,6 +65,20 @@ export default function AuthLayout() {
           return;
         }
 
+        // KEY FALLBACK: server returns currentPlan='trial' even for users with
+        // NO subscription. expiresAt is only non-null when a real sub exists.
+        try {
+          const billing = await fetchAPI("/api/billing");
+          const hasRealSub = billing?.expiresAt != null;
+          if (hasRealSub) {
+            await setOnboardingComplete(true);
+            await setCurrentPlan(billing.currentPlan);
+            await setPlanExpiresAt(billing.expiresAt);
+            setState("home");
+            return;
+          }
+        } catch { /* billing unavailable — continue to onboarding */ }
+
         // Server says incomplete — resume mid-flow
         const serverStep: number = userProfile?.onboarding_step ?? 0;
         const localStep = await getOnboardingStep();

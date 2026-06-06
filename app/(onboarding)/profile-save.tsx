@@ -22,7 +22,7 @@ import { useColorScheme } from "nativewind";
 import { getThemeColors } from "@/constants/theme";
 import { fetchAPI } from "@/lib/fetch";
 import { setAuthTokenGetter } from "@/lib/fetch";
-import { setOnboardingStep } from "@/lib/onboarding";
+import { setOnboardingStep, getSignupName } from "@/lib/onboarding";
 
 type Status = "loading" | "success" | "error";
 
@@ -51,8 +51,22 @@ export default function ProfileSave() {
 
     try {
       const token = await getToken();
-      const firstName = user!.firstName || "Unknown";
-      const lastName = user!.lastName || "Unknown";
+      
+      let firstName = user!.firstName;
+      let lastName = user!.lastName;
+
+      if (!firstName || !lastName || firstName === "" || lastName === "") {
+        const savedName = await getSignupName();
+        if (savedName) {
+          const parts = savedName.split(' ');
+          firstName = parts[0] || firstName;
+          lastName = parts.slice(1).join(' ') || lastName;
+        }
+      }
+
+      firstName = firstName || "Unknown";
+      lastName = lastName || "Unknown";
+
       const email = user!.primaryEmailAddress?.emailAddress ?? "";
 
       await fetchAPI("/api/users", {

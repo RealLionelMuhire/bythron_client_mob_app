@@ -59,7 +59,7 @@ const SignUp = () => {
     if (!firstName) return setError("Please enter your first name.");
     if (!lastName) return setError("Please enter your last name.");
     if (!email) return setError("Please enter your email.");
-    
+
     // Strong password validation
     const hasUpperCase = /[A-Z]/.test(password);
     const hasNumber = /[0-9]/.test(password);
@@ -156,7 +156,7 @@ const SignUp = () => {
                 <View style={[styles.inputRow, { backgroundColor: isDark ? colors.surface.card : "#F0F6FF", borderColor: focusedField === "lastName" ? colors.accent[500] : colors.surface.border }]}>
                   <TextInput
                     style={[styles.input, { color: colors.text.primary }]}
-                    placeholder="e.g. Smith"
+                    placeholder="e.g. Muhire"
                     placeholderTextColor={colors.text.muted}
                     textContentType="familyName"
                     autoCapitalize="words"

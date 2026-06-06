@@ -179,9 +179,6 @@ const Home = () => {
                 </Text>
               </View>
               <View className="flex-row">
-                <TouchableOpacity className="w-10 h-10 items-center justify-center mr-2">
-                  <Image source={icons.chat} className="w-6 h-6" tintColor={colors.accent[500]} />
-                </TouchableOpacity>
                 <TouchableOpacity
                   className="w-10 h-10 items-center justify-center"
                   onPress={() => router.push("/(root)/(tabs)/settings")}
@@ -224,7 +221,11 @@ const Home = () => {
             <TouchableOpacity 
               onPress={() => setShowUpgrade(true)}
               style={{
-                backgroundColor: daysLeft <= 3 || daysLeft <= 0 ? colors.status.error : colors.accent[500],
+                backgroundColor: daysLeft <= 0
+                  ? colors.status.error
+                  : daysLeft <= 3
+                    ? "#F59E0B"
+                    : colors.accent[500],
                 paddingHorizontal: 12,
                 paddingVertical: 8,
                 borderRadius: 8

@@ -147,42 +147,45 @@ export default function OtpVerify() {
             </Text>
           </View>
 
-          {/* OTP digit display (visual only — single hidden input) */}
-          <View style={styles.otpRow}>
-            {digits.map((d, i) => (
-              <View
-                key={i}
-                style={[
-                  styles.otpBox,
-                  {
-                    backgroundColor: isDark ? colors.surface.card : "#F0F6FF",
-                    borderColor: d
-                      ? colors.accent[500]
-                      : colors.surface.border,
-                  },
-                ]}
-              >
-                <Text style={[styles.otpDigit, { color: colors.text.primary }]}>
-                  {d || ""}
-                </Text>
-              </View>
-            ))}
-          </View>
+          {/* OTP Input Container */}
+          <View style={styles.otpContainer}>
+            {/* Visual digit display */}
+            <View style={styles.otpRow} pointerEvents="none">
+              {digits.map((d, i) => (
+                <View
+                  key={i}
+                  style={[
+                    styles.otpBox,
+                    {
+                      backgroundColor: isDark ? colors.surface.card : "#F0F6FF",
+                      borderColor: d
+                        ? colors.accent[500]
+                        : colors.surface.border,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.otpDigit, { color: colors.text.primary }]}>
+                    {d || ""}
+                  </Text>
+                </View>
+              ))}
+            </View>
 
-          {/* Hidden text input that drives the digit boxes */}
-          <TextInput
-            style={styles.hiddenInput}
-            value={otpCode}
-            onChangeText={(v) => {
-              const digits = v.replace(/[^0-9]/g, "").slice(0, 6);
-              setOtpCode(digits);
-              setError(null);
-            }}
-            keyboardType="number-pad"
-            maxLength={6}
-            autoFocus
-            caretHidden
-          />
+            {/* Invisible real text input overlaying the visual display */}
+            <TextInput
+              style={styles.realInput}
+              value={otpCode}
+              onChangeText={(v) => {
+                const digits = v.replace(/[^0-9]/g, "").slice(0, 6);
+                setOtpCode(digits);
+                setError(null);
+              }}
+              keyboardType="number-pad"
+              maxLength={6}
+              autoFocus
+              caretHidden
+            />
+          </View>
 
           {/* Error */}
           {error ? (
@@ -259,12 +262,20 @@ function createStyles(colors: ReturnType<typeof getThemeColors>, isDark: boolean
       justifyContent: "center",
     },
     otpDigit: { fontSize: 24, fontFamily: "Jakarta-Bold" },
-    // Hidden real input behind the visual boxes
-    hiddenInput: {
+    otpContainer: {
+      position: "relative",
+      width: "100%",
+      height: 58,
+    },
+    realInput: {
       position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
       opacity: 0,
-      height: 0,
-      width: 0,
+      color: "transparent",
+      fontSize: 1, // Minimize visible artifacts
     },
     errorBox: {
       borderWidth: 1,

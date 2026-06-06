@@ -31,7 +31,7 @@ import type { RedirectParams } from "flutterwave-react-native/dist/PayWithFlutte
 import CustomButton from "@/components/CustomButton";
 import { getThemeColors } from "@/constants/theme";
 import { fetchAPI } from "@/lib/fetch";
-import { setOnboardingComplete, setOnboardingStep, setCurrentPlan, setPlanExpiresAt, getCurrentPlan, isOnboardingComplete } from "@/lib/onboarding";
+import { setOnboardingComplete, setOnboardingStep, setCurrentPlan, setPlanExpiresAt, getPlanExpiresAt, isOnboardingComplete } from "@/lib/onboarding";
 import { PLANS, PlanId, getPlan } from "@/constants/plans";
 import FlutterwavePayment from "@/components/FlutterwavePayment";
 
@@ -59,9 +59,15 @@ export default function PlanScreen() {
   // ── Guard: skip plan screen if user already has a plan ──────────────────
   useEffect(() => {
     (async () => {
+      // isOnboardingComplete() is the strongest signal — if true, go home
       const alreadyDone = await isOnboardingComplete();
-      const existingPlan = await getCurrentPlan();
-      if (alreadyDone || existingPlan) {
+      if (alreadyDone) {
+        router.replace("/(root)/(tabs)/home");
+        return;
+      }
+      // Secondary: if there's a saved plan expiry, a real subscription exists
+      const expiry = await getPlanExpiresAt();
+      if (expiry) {
         router.replace("/(root)/(tabs)/home");
       }
     })();
