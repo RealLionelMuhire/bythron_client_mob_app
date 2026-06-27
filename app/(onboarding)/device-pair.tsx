@@ -49,7 +49,7 @@ export default function DevicePair() {
 
   // When a scanned IMEI arrives, pre-fill and auto-pair
   useEffect(() => {
-    if (scannedImei && /^\d{15}$/.test(scannedImei)) {
+    if (scannedImei && /^\d{15,16}$/.test(scannedImei)) {
       setImei(scannedImei);
       setError(null);
       // Small delay so the user sees the pre-filled value before pairing starts
@@ -88,8 +88,8 @@ export default function DevicePair() {
 
   const onPairDevice = () => {
     const trimmed = imei.trim();
-    if (!/^\d{15}$/.test(trimmed)) {
-      setError("Please enter a valid 15-digit IMEI number.");
+    if (!/^\d{15,16}$/.test(trimmed)) {
+      setError("Please enter a valid 15 or 16-digit IMEI number.");
       return;
     }
     pairDevice(trimmed);
@@ -130,7 +130,7 @@ export default function DevicePair() {
               Connect your GPS device
             </Text>
             <Text style={[styles.subtitle, { color: colors.text.muted }]}>
-              Scan the QR code on your device or enter the 15-digit IMEI manually
+              Scan the QR code on your device or enter the IMEI manually
             </Text>
           </View>
 
@@ -171,7 +171,7 @@ export default function DevicePair() {
                 placeholder="e.g. 358765012345678"
                 placeholderTextColor={colors.text.muted}
                 keyboardType="number-pad"
-                maxLength={15}
+                maxLength={16}
                 value={imei}
                 onChangeText={(v) => {
                   setImei(v.replace(/[^0-9]/g, ""));
@@ -187,10 +187,10 @@ export default function DevicePair() {
                 <Text
                   style={[
                     styles.counter,
-                    { color: imei.length === 15 ? colors.accent[500] : colors.text.muted },
+                    { color: (imei.length === 15 || imei.length === 16) ? colors.accent[500] : colors.text.muted },
                   ]}
                 >
-                  {imei.length}/15
+                  {imei.length}/15-16
                 </Text>
               )}
             </View>

@@ -25,12 +25,12 @@ import { useColorScheme } from "nativewind";
 import CustomButton from "@/components/CustomButton";
 import { getThemeColors } from "@/constants/theme";
 import { icons, images } from "@/constants";
-import { fetchAPI } from "@/lib/fetch";
+import { fetchAPI, setAuthTokenGetter } from "@/lib/fetch";
 import { isOnboardingComplete, getOnboardingStep, stepToRoute, setOnboardingComplete, setOnboardingStep, setCurrentPlan, setPlanExpiresAt } from "@/lib/onboarding";
 
 const SignIn = () => {
   const { signIn, setActive, isLoaded } = useSignIn();
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, getToken } = useAuth();
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === "dark";
   const colors = getThemeColors(isDark ? "dark" : "light");
@@ -72,11 +72,35 @@ const SignIn = () => {
 
       if (result.status === "complete") {
         await setActive({ session: result.createdSessionId });
+        setAuthTokenGetter(getToken);
 
         // Sync onboarding state from backend to ensure we don't prompt for plan
         // if they already chose one on another device or previously.
         try {
-          const userProfile = await fetchAPI("/api/auth/me");
+          let userProfile;
+          try {
+            userProfile = await fetchAPI("/api/auth/me");
+          } catch (apiErr: any) {
+            // If the user was created externally (e.g. Clerk Dashboard), they won't be in our local DB yet.
+            // /api/auth/me will return HTTP 401 with "User profile not found". If so, auto-sync them!
+            const errMsg = apiErr.message || "";
+            if (errMsg.includes("401") || errMsg.includes("not found")) {
+              console.warn("User missing in DB, syncing via POST /api/auth/sync...");
+              userProfile = await fetchAPI("/api/auth/sync", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  clerk_user_id: result.createdUserId,
+                  email: trimmedIdentifier,
+                  first_name: "Unknown",
+                  last_name: "Unknown",
+                }),
+              });
+            } else {
+              throw apiErr;
+            }
+          }
+
           if (userProfile) {
             // Trust server's complete flag
             if (userProfile.onboarding_complete) {

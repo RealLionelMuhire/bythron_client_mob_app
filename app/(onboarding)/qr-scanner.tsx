@@ -7,7 +7,7 @@
  * then navigates back to device-pair with the IMEI pre-filled.
  *
  * QR format expected from hardware team:
- *   Plain 15-digit string — e.g. "354851090123456"
+ *   Plain 15 or 16-digit string — e.g. "354851090123456" or "0866557084544792"
  *   No JSON, no prefix, no URL.
  */
 
@@ -57,9 +57,9 @@ export default function QrScanner() {
 
     const rawValue = data?.trim() ?? "";
 
-    // Validate: must be exactly 15 digits
-    if (!/^\d{15}$/.test(rawValue)) {
-      setError(`Invalid QR code. Expected a 15-digit IMEI, got: "${rawValue.slice(0, 20)}"`);
+    // Validate: must be 15 or 16 digits
+    if (!/^\d{15,16}$/.test(rawValue)) {
+      setError(`Invalid QR code. Expected a 15 or 16-digit IMEI, got: "${rawValue.slice(0, 20)}"`);
       return;
     }
 
