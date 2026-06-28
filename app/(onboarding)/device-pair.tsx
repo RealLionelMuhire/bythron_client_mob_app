@@ -39,26 +39,30 @@ export default function DevicePair() {
   const colors = getThemeColors(isDark ? "dark" : "light");
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
 
-  // QR scanner returns here with scannedImei query param
-  const { scannedImei } = useLocalSearchParams<{ scannedImei?: string }>();
+  // QR scanner returns here with scannedImei and scannedPin query params
+  const { scannedImei, scannedPin } = useLocalSearchParams<{ scannedImei?: string, scannedPin?: string }>();
 
-  const [imei, setImei]           = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError]         = useState<string | null>(null);
-  const [focused, setFocused]     = useState(false);
+  const [imei, setImei]               = useState("");
+  const [pairingPin, setPairingPin]   = useState("");
+  const [isLoading, setIsLoading]     = useState(false);
+  const [error, setError]             = useState<string | null>(null);
+  const [focused, setFocused]         = useState(false);
+  const [pinFocused, setPinFocused]   = useState(false);
 
-  // When a scanned IMEI arrives, pre-fill and auto-pair
+  // When a scanned IMEI arrives, pre-fill both IMEI and PIN (if available)
   useEffect(() => {
     if (scannedImei && /^\d{15,16}$/.test(scannedImei)) {
       setImei(scannedImei);
+      if (scannedPin) {
+        setPairingPin(scannedPin);
+      } else {
+        setPairingPin("");
+      }
       setError(null);
-      // Small delay so the user sees the pre-filled value before pairing starts
-      const t = setTimeout(() => pairDevice(scannedImei), 600);
-      return () => clearTimeout(t);
     }
-  }, [scannedImei]);
+  }, [scannedImei, scannedPin]);
 
-  const pairDevice = async (imeiValue: string) => {
+  const pairDevice = async (imeiValue: string, pin: string) => {
     setIsLoading(true);
     setError(null);
 
@@ -70,16 +74,23 @@ export default function DevicePair() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ imei: imeiValue }),
+        body: JSON.stringify({
+          imei: imeiValue,
+          pairingPin: pin.trim().toUpperCase() || undefined,
+        }),
       });
 
       await setPairedImei(imeiValue);
       await setOnboardingStep(6);
       router.replace("/(onboarding)/device-wait" as any);
     } catch (err: any) {
-      const msg = err?.message?.includes("404")
-        ? "Device not found. Check your IMEI and retry."
-        : err?.message ?? "Pairing failed. Check your IMEI and retry.";
+      const raw: string = err?.message ?? "";
+      let msg = "Pairing failed. Check your IMEI and retry.";
+      if (raw.includes("404")) msg = "Device not found. Check your IMEI and retry.";
+      else if (raw.includes("403")) msg = "Incorrect Pairing PIN. Check the card inside the box.";
+      else if (raw.includes("409")) msg = raw.includes("not yet connected")
+        ? "Device has not connected to the server yet. Power it on with the SIM inserted first."
+        : "Device already registered to another account.";
       setError(msg);
     } finally {
       setIsLoading(false);
@@ -92,7 +103,7 @@ export default function DevicePair() {
       setError("Please enter a valid 15 or 16-digit IMEI number.");
       return;
     }
-    pairDevice(trimmed);
+    pairDevice(trimmed, pairingPin);
   };
 
   const onScanQr = () => {
@@ -179,8 +190,7 @@ export default function DevicePair() {
                 }}
                 onFocus={() => setFocused(true)}
                 onBlur={() => setFocused(false)}
-                returnKeyType="done"
-                onSubmitEditing={onPairDevice}
+                returnKeyType="next"
                 editable={!isLoading}
               />
               {imei.length > 0 && (
@@ -196,6 +206,41 @@ export default function DevicePair() {
             </View>
             <Text style={[styles.hint, { color: colors.text.muted }]}>
               Find the IMEI printed on the device label or packaging
+            </Text>
+          </View>
+
+          {/* Pairing PIN input */}
+          <View style={styles.fieldWrap}>
+            <Text style={[styles.label, { color: colors.text.secondary }]}>Pairing PIN</Text>
+            <View
+              style={[
+                styles.inputRow,
+                {
+                  backgroundColor: isDark ? colors.surface.card : "#F0F6FF",
+                  borderColor: pinFocused ? colors.accent[500] : colors.surface.border,
+                },
+              ]}
+            >
+              <TextInput
+                style={[styles.input, { color: colors.text.primary }]}
+                placeholder="e.g. AB3X9K"
+                placeholderTextColor={colors.text.muted}
+                autoCapitalize="characters"
+                maxLength={8}
+                value={pairingPin}
+                onChangeText={(v) => {
+                  setPairingPin(v.toUpperCase());
+                  setError(null);
+                }}
+                onFocus={() => setPinFocused(true)}
+                onBlur={() => setPinFocused(false)}
+                returnKeyType="done"
+                onSubmitEditing={onPairDevice}
+                editable={!isLoading}
+              />
+            </View>
+            <Text style={[styles.hint, { color: colors.text.muted }]}>
+              6-character PIN printed on the card inside the device box
             </Text>
           </View>
 

@@ -56,20 +56,31 @@ export default function QrScanner() {
     if (scanned) return; // prevent multiple triggers
 
     const rawValue = data?.trim() ?? "";
+    let parsedImei = rawValue;
+    let parsedPin = "";
+
+    try {
+      // Try to parse the new JSON payload format
+      const dataObj = JSON.parse(rawValue);
+      if (dataObj.imei) parsedImei = String(dataObj.imei).trim();
+      if (dataObj.pin) parsedPin = String(dataObj.pin).trim();
+    } catch {
+      // Not JSON, assume it's just the raw IMEI string from older QR codes
+    }
 
     // Validate: must be 15 or 16 digits
-    if (!/^\d{15,16}$/.test(rawValue)) {
-      setError(`Invalid QR code. Expected a 15 or 16-digit IMEI, got: "${rawValue.slice(0, 20)}"`);
+    if (!/^\d{15,16}$/.test(parsedImei)) {
+      setError(`Invalid QR code. Expected a 15 or 16-digit IMEI.`);
       return;
     }
 
     setScanned(true);
     Vibration.vibrate(120); // haptic confirmation
 
-    // Route back with IMEI as query param
+    // Route back with IMEI and PIN as query params
     router.replace({
       pathname: "/(onboarding)/device-pair" as any,
-      params: { scannedImei: rawValue },
+      params: { scannedImei: parsedImei, scannedPin: parsedPin },
     });
   };
 
