@@ -28,10 +28,11 @@ import { getThemeColors } from "@/constants/theme";
 import { useDeviceStore, useLocationStore } from "@/store";
 import { Device, Location } from "@/types/type";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { useDeviceWebSocket } from "@/lib/useDeviceWebSocket";
+import { useDeviceWebSocket, AlarmPayload } from "@/lib/useDeviceWebSocket";
 import { MapScaleBar } from "@/components/MapScaleBar";
 import { Speedometer } from "@/components/Speedometer";
 import { TrackingMarker } from "@/components/TrackingMarker";
+import { AlertDialog, useDialog, DialogType } from "@/components/AppModals";
 
 
 const normalizeBearing = (value: number) => ((value % 360) + 360) % 360;
@@ -55,12 +56,23 @@ if (accessToken) {
   Mapbox.setAccessToken(accessToken);
 }
 
+// Maps raw alarm_type strings (from the GPS device protocol) to UI metadata.
+const ALARM_LABEL_MAP: Record<string, { label: string; icon: keyof typeof Ionicons.glyphMap; type: DialogType }> = {
+  sos:          { label: "SOS Alert",          icon: "alert-circle",   type: "error" },
+  vibration:    { label: "Vibration Detected",  icon: "phone-portrait", type: "warning" },
+  low_battery:  { label: "Low Battery",         icon: "battery-dead",   type: "warning" },
+  acc:          { label: "Ignition Change",     icon: "key",            type: "info" },
+  overspeed:    { label: "Overspeed Alert",     icon: "speedometer",    type: "error" },
+  displacement: { label: "Displacement Alert",  icon: "locate",         type: "warning" },
+};
+
 const Tracking = () => {
   const { colorScheme } = useColorScheme();
   const colors = getThemeColors(colorScheme === "dark" ? "dark" : "light");
   const styles = useMemo(() => createTrackingStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const { getToken } = useAuth();
+  const { dialog, showDialog, hideDialog } = useDialog();
   const devices = useDeviceStore((s) => s.devices);
   const currentLocation = useDeviceStore((s) => s.currentLocation);
   const setCurrentLocation = useDeviceStore((s) => s.setCurrentLocation);
@@ -113,7 +125,23 @@ const Tracking = () => {
     [setCurrentLocation],
   );
 
-  useDeviceWebSocket(device?.id ?? null, handleLiveLocation, undefined, getToken);
+  /** Called whenever the GPS device fires an alarm event over the WebSocket. */
+  const handleAlarm = useCallback(
+    (data: AlarmPayload) => {
+      const key = data.alarm_type?.toLowerCase() ?? "";
+      const info = ALARM_LABEL_MAP[key] ?? {
+        label: "Device Alarm",
+        icon: "alert-circle" as const,
+        type: "warning" as const,
+      };
+      const deviceLabel = device?.name ?? `Device ${data.device_id}`;
+      const time = new Date(data.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      showDialog(info.type, info.label, `${deviceLabel} • ${time}`, info.icon);
+    },
+    [device?.name, showDialog],
+  );
+
+  useDeviceWebSocket(device?.id ?? null, handleLiveLocation, handleAlarm, getToken);
 
   useEffect(() => {
     setBatteryLevel(typeof device?.battery_level === "number" ? device.battery_level : null);
@@ -511,6 +539,9 @@ const Tracking = () => {
           </Pressable>
         </Modal>
       )}
+
+      {/* Alarm notification — fires when the GPS device sends an alarm event over WebSocket */}
+      <AlertDialog dialog={dialog} onClose={hideDialog} isDark={colorScheme === "dark"} />
     </View>
   );
 };

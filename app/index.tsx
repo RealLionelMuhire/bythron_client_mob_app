@@ -39,7 +39,7 @@ export default function Index() {
   useEffect(() => {
     if (!isLoaded) return;
     if (!isSignedIn) {
-      setState("onboarding"); // will render /sign-up redirect below
+      setState("onboarding"); // will render /sign-in redirect below
       return;
     }
 
@@ -109,7 +109,7 @@ export default function Index() {
 
   if (!isLoaded || state === "loading") return null;
 
-  if (!isSignedIn) return <Redirect href="/(auth)/sign-up" />;
+  if (!isSignedIn) return <Redirect href="/(auth)/sign-in" />;
 
   if (state === "home") return <Redirect href="/(root)/(tabs)/home" />;
 

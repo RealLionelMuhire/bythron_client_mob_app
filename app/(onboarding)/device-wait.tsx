@@ -90,7 +90,7 @@ export default function DeviceWait() {
       try {
         const imei  = await getPairedImei();
         const token = await getToken();
-        const res   = await fetchAPI(`/api/devices/${imei}/status`, {
+        const res   = await fetchAPI(`/api/devices/imei/${imei}/status`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 

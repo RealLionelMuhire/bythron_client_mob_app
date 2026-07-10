@@ -19,6 +19,8 @@ const KEY_DONE = "onboarding_complete";
 const KEY_IMEI = "paired_imei";
 const KEY_PHONE = "signup_phone";
 const KEY_NAME = "signup_name";
+const KEY_CURRENT_PLAN = "current_plan";
+const KEY_PLAN_EXPIRES_AT = "plan_expires_at";
 
 // ── Step ──────────────────────────────────────────────────────────────────
 
@@ -102,6 +104,28 @@ export async function setSignupName(name: string): Promise<void> {
 
 // ── Full reset (on sign-out) ──────────────────────────────────────────────
 
+export async function setCurrentPlan(planId: string): Promise<void> {
+  try {
+    await SecureStore.setItemAsync(KEY_CURRENT_PLAN, planId);
+  } catch { }
+}
+
+export async function getPlanExpiresAt(): Promise<string | null> {
+  try {
+    return await SecureStore.getItemAsync(KEY_PLAN_EXPIRES_AT);
+  } catch {
+    return null;
+  }
+}
+
+export async function setPlanExpiresAt(expiresAt: string): Promise<void> {
+  try {
+    await SecureStore.setItemAsync(KEY_PLAN_EXPIRES_AT, expiresAt);
+  } catch { }
+}
+
+// ── Full reset (on sign-out) ──────────────────────────────────────────────
+
 export async function clearOnboardingState(): Promise<void> {
   try {
     await SecureStore.deleteItemAsync(KEY_STEP);
@@ -109,6 +133,8 @@ export async function clearOnboardingState(): Promise<void> {
     await SecureStore.deleteItemAsync(KEY_IMEI);
     await SecureStore.deleteItemAsync(KEY_PHONE);
     await SecureStore.deleteItemAsync(KEY_NAME);
+    await SecureStore.deleteItemAsync(KEY_CURRENT_PLAN);
+    await SecureStore.deleteItemAsync(KEY_PLAN_EXPIRES_AT);
   } catch { }
 }
 

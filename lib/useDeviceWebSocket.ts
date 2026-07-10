@@ -20,7 +20,7 @@ import { Location, LiveLocation } from "@/types/type";
 const WS_RECONNECT_DELAY_MS = 3_000;  // wait 3s before reconnecting
 const WS_PING_INTERVAL_MS   = 25_000; // keep-alive ping cadence
 
-type AlarmPayload = {
+export type AlarmPayload = {
   type: "alarm";
   device_id: number;
   alarm_type: string | null;
