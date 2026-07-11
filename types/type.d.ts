@@ -30,6 +30,31 @@ declare interface Location {
   timestamp: string;
 }
 
+/** An alarm event recorded to the in-memory alarm log. */
+declare interface AlarmLogEntry {
+  /** Unique ID for list rendering (timestamp-deviceId). */
+  id: string;
+  alarm_type: string;    // raw key from WebSocket (e.g. "sos", "overspeed")
+  device_id: number;
+  device_name: string;   // resolved at insert time from Zustand device list
+  latitude: number;
+  longitude: number;
+  timestamp: string;     // ISO-8601
+}
+
+/**
+ * Shape of the global alarm banner state.
+ * Mirrors BannerAlarm from AlarmBanner.tsx but uses plain types so it can
+ * live in a .d.ts declaration file without importing from components.
+ */
+declare interface AlarmBannerState {
+  title: string;
+  message: string;
+  icon: string;
+  type: "error" | "warning" | "info" | "success";
+  autoDismissMs?: number;
+}
+
 /**
  * Real-time location frame pushed by the server over WebSocket.
  * Matches the payload built in tcp_server.py → broadcast_location_update().
@@ -154,6 +179,10 @@ declare interface DeviceStore {
   isLoadingLocation: boolean;
   historyFullScreen: boolean;
   devicesReady: boolean;
+  /** In-memory log of the last 100 alarm events (newest first). Persisted via AsyncStorage. */
+  alarmLog: AlarmLogEntry[];
+  /** Global alarm banner — shown by (root)/_layout.tsx so it overlays all screens. */
+  globalBanner: AlarmBannerState | null;
   setSelectedDevice: (deviceId: number) => void;
   setDevices: (devices: Device[]) => void;
   clearSelectedDevice: () => void;
@@ -161,6 +190,10 @@ declare interface DeviceStore {
   setLoadingLocation: (loading: boolean) => void;
   setHistoryFullScreen: (v: boolean) => void;
   setDevicesReady: (v: boolean) => void;
+  addAlarmToLog: (entry: AlarmLogEntry) => void;
+  clearAlarmLog: () => void;
+  setGlobalBanner: (banner: AlarmBannerState) => void;
+  clearGlobalBanner: () => void;
 }
 
 declare interface UserStore {

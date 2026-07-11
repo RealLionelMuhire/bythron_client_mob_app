@@ -1,6 +1,9 @@
 import { create } from "zustand";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { DeviceStore, LocationStore, UserStore, Device, Location, UserData } from "@/types/type";
+
+export const ALARM_LOG_STORAGE_KEY = "bythron:alarmLog";
 
 export const useLocationStore = create<LocationStore>((set) => ({
   userLatitude: null,
@@ -57,6 +60,8 @@ export const useDeviceStore = create<DeviceStore>((set) => ({
   isLoadingLocation: false,
   historyFullScreen: false,
   devicesReady: false,
+  alarmLog: [] as AlarmLogEntry[],
+  globalBanner: null,
   setSelectedDevice: (deviceId: number) =>
     set(() => ({ selectedDevice: deviceId })),
   setDevices: (devices: Device[]) => set(() => ({ devices })),
@@ -65,6 +70,19 @@ export const useDeviceStore = create<DeviceStore>((set) => ({
   setLoadingLocation: (loading: boolean) => set(() => ({ isLoadingLocation: loading })),
   setHistoryFullScreen: (v: boolean) => set(() => ({ historyFullScreen: v })),
   setDevicesReady: (v: boolean) => set(() => ({ devicesReady: v })),
+  addAlarmToLog: (entry: AlarmLogEntry) =>
+    set((state) => {
+      const next = [entry, ...state.alarmLog].slice(0, 100);
+      // Persist to AsyncStorage (fire-and-forget)
+      AsyncStorage.setItem(ALARM_LOG_STORAGE_KEY, JSON.stringify(next)).catch(() => {});
+      return { alarmLog: next };
+    }),
+  clearAlarmLog: () => {
+    AsyncStorage.removeItem(ALARM_LOG_STORAGE_KEY).catch(() => {});
+    set(() => ({ alarmLog: [] }));
+  },
+  setGlobalBanner: (banner: AlarmBannerState) => set(() => ({ globalBanner: banner })),
+  clearGlobalBanner: () => set(() => ({ globalBanner: null })),
 }));
 
 export const useUserStore = create<UserStore>((set) => ({

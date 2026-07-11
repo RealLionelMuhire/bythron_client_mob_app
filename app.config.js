@@ -52,6 +52,15 @@ module.exports = {
           recordAudioAndroid: false,
         },
       ],
+      [
+        "expo-notifications",
+        {
+          icon: "./assets/images/icon.png",
+          color: "#2F80ED",
+          defaultChannel: "gps-alarms",
+          sounds: [],
+        },
+      ],
     ],
     experiments: {
       typedRoutes: true,

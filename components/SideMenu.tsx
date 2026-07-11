@@ -201,7 +201,7 @@ export default function SideMenu({ isVisible, onDismiss, onShowUpgrade, onShowBi
             <MenuItem
               icon="notifications-outline"
               title="Notifications"
-              onPress={() => { onDismiss(); router.push("/(root)/(tabs)/alerts" as any); }}
+              onPress={() => { onDismiss(); router.push("/(root)/(tabs)/alarm-log" as any); }}
               colors={colors}
             />
             <MenuItem

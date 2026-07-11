@@ -15,6 +15,7 @@ import {
   UIManager,
   Modal,
   Pressable,
+  Vibration,
 } from "react-native";
 
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -32,7 +33,7 @@ import { useDeviceWebSocket, AlarmPayload } from "@/lib/useDeviceWebSocket";
 import { MapScaleBar } from "@/components/MapScaleBar";
 import { Speedometer } from "@/components/Speedometer";
 import { TrackingMarker } from "@/components/TrackingMarker";
-import { AlertDialog, useDialog, DialogType } from "@/components/AppModals";
+import { ALARM_META_BY_KEY } from "@/constants/alarms";
 
 
 const normalizeBearing = (value: number) => ((value % 360) + 360) % 360;
@@ -57,14 +58,7 @@ if (accessToken) {
 }
 
 // Maps raw alarm_type strings (from the GPS device protocol) to UI metadata.
-const ALARM_LABEL_MAP: Record<string, { label: string; icon: keyof typeof Ionicons.glyphMap; type: DialogType }> = {
-  sos:          { label: "SOS Alert",          icon: "alert-circle",   type: "error" },
-  vibration:    { label: "Vibration Detected",  icon: "phone-portrait", type: "warning" },
-  low_battery:  { label: "Low Battery",         icon: "battery-dead",   type: "warning" },
-  acc:          { label: "Ignition Change",     icon: "key",            type: "info" },
-  overspeed:    { label: "Overspeed Alert",     icon: "speedometer",    type: "error" },
-  displacement: { label: "Displacement Alert",  icon: "locate",         type: "warning" },
-};
+// Removed: ALARM_LABEL_MAP — replaced by ALARM_META_BY_KEY from @/constants/alarms
 
 const Tracking = () => {
   const { colorScheme } = useColorScheme();
@@ -72,8 +66,8 @@ const Tracking = () => {
   const styles = useMemo(() => createTrackingStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const { getToken } = useAuth();
-  const { dialog, showDialog, hideDialog } = useDialog();
   const devices = useDeviceStore((s) => s.devices);
+  const setGlobalBanner = useDeviceStore((s) => s.setGlobalBanner);
   const currentLocation = useDeviceStore((s) => s.currentLocation);
   const setCurrentLocation = useDeviceStore((s) => s.setCurrentLocation);
   const userLatitude = useLocationStore((s) => s.userLatitude);
@@ -129,16 +123,42 @@ const Tracking = () => {
   const handleAlarm = useCallback(
     (data: AlarmPayload) => {
       const key = data.alarm_type?.toLowerCase() ?? "";
-      const info = ALARM_LABEL_MAP[key] ?? {
-        label: "Device Alarm",
-        icon: "alert-circle" as const,
-        type: "warning" as const,
-      };
+      const meta = ALARM_META_BY_KEY[key];
+      const label = meta?.label ?? "Device Alarm";
+      const icon = (meta?.icon ?? "alert-circle") as keyof typeof Ionicons.glyphMap;
+      const type  = meta?.bannerType ?? "warning";
+
       const deviceLabel = device?.name ?? `Device ${data.device_id}`;
       const time = new Date(data.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-      showDialog(info.type, info.label, `${deviceLabel} • ${time}`, info.icon);
+
+      // Haptic / vibration feedback: SOS = long double buzz, others = single short
+      if (key === "sos") {
+        Vibration.vibrate([0, 600, 200, 600]);
+      } else {
+        Vibration.vibrate(400);
+      }
+
+      // Show the global banner (visible on any screen via root layout)
+      setGlobalBanner({
+        title: label,
+        message: `${deviceLabel} \u2022 ${time}`,
+        icon,
+        type,
+        autoDismissMs: key === "sos" ? 0 : 5000,
+      });
+
+      // Persist to alarm history log (accessible from SideMenu → Notifications)
+      useDeviceStore.getState().addAlarmToLog({
+        id: `${Date.now()}-${data.device_id}`,
+        alarm_type: key,
+        device_id: data.device_id,
+        device_name: deviceLabel,
+        latitude: data.latitude,
+        longitude: data.longitude,
+        timestamp: data.timestamp,
+      });
     },
-    [device?.name, showDialog],
+    [device?.name],
   );
 
   useDeviceWebSocket(device?.id ?? null, handleLiveLocation, handleAlarm, getToken);
@@ -540,8 +560,7 @@ const Tracking = () => {
         </Modal>
       )}
 
-      {/* Alarm notification — fires when the GPS device sends an alarm event over WebSocket */}
-      <AlertDialog dialog={dialog} onClose={hideDialog} isDark={colorScheme === "dark"} />
+      {/* AlarmBanner is rendered globally in (root)/_layout.tsx — visible on all screens */}
     </View>
   );
 };
