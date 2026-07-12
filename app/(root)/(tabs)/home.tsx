@@ -22,7 +22,6 @@ import { useLocationStore, useDeviceStore, useUserStore } from "@/store";
 import { refreshDevices } from "@/lib/deviceService";
 import { getCurrentPlan, getPlanExpiresAt } from "@/lib/onboarding";
 import { getPlan, PlanId } from "@/constants/plans";
-import SideMenu from "@/components/SideMenu";
 import UpgradeSheet from "@/components/UpgradeSheet";
 import BillingSheet from "@/components/BillingSheet";
 
@@ -49,7 +48,6 @@ const Home = () => {
   const [expiresAt, setExpiresAtState] = useState<string | null>(null);
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [showBilling, setShowBilling] = useState(false);
-  const [showSideMenu, setShowSideMenu] = useState(false);
 
   const loadPlanInfo = async () => {
     const p = await getCurrentPlan();
@@ -123,7 +121,7 @@ const Home = () => {
     switch (screen) {
       case "tracking": router.push("/(root)/(tabs)/tracking"); break;
       case "vehicles": router.push("/(root)/(tabs)/vehicles"); break;
-      case "alerts":   router.push("/(root)/(tabs)/alerts");   break;
+      case "alerts":   router.push("/(root)/alerts");   break;
       case "settings": router.push("/(root)/(tabs)/settings"); break;
       default: break;
     }
@@ -131,21 +129,6 @@ const Home = () => {
 
   return (
     <View className={`flex-1 ${isDark ? "bg-slate-900" : "bg-surface-light"}`}>
-      {/* Fixed Top Bar */}
-      <View className={`pt-10 ${isDark ? "bg-slate-800" : "bg-accent-200"}`}>
-        <View className="px-5 py-2">
-          <View className="flex-row justify-between items-center">
-            <TouchableOpacity className="p-2" onPress={() => setShowSideMenu(true)}>
-              <Ionicons name="menu" size={28} color={colors.text.primary} />
-            </TouchableOpacity>
-            <Text className={`text-xl font-JakartaBold ${isDark ? "text-slate-100" : "text-slate-900"}`}>Dashboard</Text>
-            <TouchableOpacity className="p-2" onPress={() => router.push("/(root)/(tabs)/settings")}>
-              <Ionicons name="settings-outline" size={26} color={colors.text.primary} />
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-
       <ScrollView
         className="flex-1"
         showsVerticalScrollIndicator={false}
@@ -364,13 +347,6 @@ const Home = () => {
       </ScrollView>
 
       {/* Modals & Bottom Sheets */}
-      <SideMenu 
-        isVisible={showSideMenu} 
-        onDismiss={() => setShowSideMenu(false)} 
-        onShowUpgrade={() => setShowUpgrade(true)} 
-        onShowBilling={() => setShowBilling(true)} 
-      />
-      
       <UpgradeSheet 
         isVisible={showUpgrade} 
         currentPlan={currentPlan} 

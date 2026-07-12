@@ -45,7 +45,7 @@ const SignIn = () => {
   const [focused, setFocused] = useState<string | null>(null);
 
   if (isSignedIn) {
-    return <Redirect href="/(root)/(tabs)/home" />;
+    return <Redirect href="/" />;
   }
 
   const onSignIn = async () => {
@@ -70,74 +70,45 @@ const SignIn = () => {
         password,
       });
 
+      console.log("CLERK SIGN-IN RESULT:", JSON.stringify(result, null, 2));
+
       if (result.status === "complete") {
         await setActive({ session: result.createdSessionId });
-        setAuthTokenGetter(getToken);
-
-        // Sync onboarding state from backend to ensure we don't prompt for plan
-        // if they already chose one on another device or previously.
-        try {
-          let userProfile;
-          try {
-            userProfile = await fetchAPI("/api/auth/me");
-          } catch (apiErr: any) {
-            // If the user was created externally (e.g. Clerk Dashboard), they won't be in our local DB yet.
-            // /api/auth/me will return HTTP 401 with "User profile not found". If so, auto-sync them!
-            const errMsg = apiErr.message || "";
-            if (errMsg.includes("401") || errMsg.includes("not found")) {
-              console.warn("User missing in DB, syncing via POST /api/auth/sync...");
-              userProfile = await fetchAPI("/api/auth/sync", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  clerk_user_id: result.createdUserId,
-                  email: trimmedIdentifier,
-                  first_name: "Unknown",
-                  last_name: "Unknown",
-                }),
-              });
-            } else {
-              throw apiErr;
-            }
-          }
-
-          if (userProfile) {
-            // Trust server's complete flag
-            if (userProfile.onboarding_complete) {
-              await setOnboardingComplete(true);
-            }
-            // Only advance step, don't regress
-            const serverStep = userProfile.onboarding_step ?? 0;
-            const localStep = await getOnboardingStep();
-            if (serverStep > localStep) {
-              await setOnboardingStep(serverStep);
-            }
-          }
-
-          // Fetch billing to sync current plan
-          const billingInfo = await fetchAPI("/api/billing");
-          if (billingInfo && billingInfo.currentPlan) {
-            await setCurrentPlan(billingInfo.currentPlan);
-            if (billingInfo.expiresAt) {
-              await setPlanExpiresAt(billingInfo.expiresAt);
-            }
-            // If they have a plan that isn't the default null state, they're done with onboarding
-            await setOnboardingComplete(true);
-          }
-        } catch (err) {
-          console.warn("Failed to sync onboarding state on sign in:", err);
-        }
-
-        // Route based on the freshly synced state
-        const done = await isOnboardingComplete();
-        const step = await getOnboardingStep();
-        if (done || step >= 8) {
-          router.replace("/(root)/(tabs)/home");
+        // The component will re-render, isSignedIn will become true, and the <Redirect href="/" />
+        // at the top of the file will trigger. The global index.tsx handles the backend sync and routing!
+      } else if (result.status === "needs_first_factor") {
+        // This happens if the user signed up but never verified their email
+        const emailFactor = result.supportedFirstFactors?.find((f: any) => f.strategy === "email_code");
+        if (emailFactor) {
+          await signIn.prepareFirstFactor({
+            strategy: "email_code",
+            emailAddressId: emailFactor.emailAddressId,
+          });
+          router.push({ pathname: "/(auth)/otp-verify", params: { type: "email", flow: "signIn" } } as any);
         } else {
-          router.replace(stepToRoute(step) as any);
+          setError(`Additional verification required. Code: ${result.status}`);
+        }
+      } else if (result.status === "needs_second_factor") {
+        // Clerk requires a second factor — check which strategy is available
+        const secondFactors = result.supportedSecondFactors ?? [];
+        const emailFactor = secondFactors.find((f: any) => f.strategy === "email_code");
+        const totpFactor  = secondFactors.find((f: any) => f.strategy === "totp");
+
+        if (emailFactor) {
+          // Email code as second factor — prepare it first
+          await signIn.prepareSecondFactor({
+            strategy: "email_code",
+            emailAddressId: emailFactor.emailAddressId,
+          });
+          router.push({ pathname: "/(auth)/otp-verify", params: { type: "email", flow: "mfa" } } as any);
+        } else if (totpFactor) {
+          // TOTP authenticator app — no preparation needed
+          router.push({ pathname: "/(auth)/otp-verify", params: { type: "totp", flow: "mfa" } } as any);
+        } else {
+          setError("A second verification step is required but no supported method was found.");
         }
       } else {
-        setError("Sign in requires additional verification.");
+        setError(`Additional verification required. Code: ${result.status}`);
       }
     } catch (err: any) {
       const msg = err?.errors?.[0]?.longMessage ?? err?.errors?.[0]?.message ?? "Sign-in failed. Check your credentials.";

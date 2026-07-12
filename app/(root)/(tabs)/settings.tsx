@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -19,7 +19,8 @@ import { fetchAPI } from "@/lib/fetch";
 import { saveColorScheme } from "@/lib/theme";
 import { useDeviceStore } from "@/store";
 import { AlertDialog, ConfirmModal, useDialog, useConfirmModal } from "@/components/AppModals";
-import { clearOnboardingState } from "@/lib/onboarding";
+import { clearOnboardingState, getCurrentPlan, getPlanExpiresAt } from "@/lib/onboarding";
+import { getPlan, PlanId } from "@/constants/plans";
 
 const Settings = () => {
   const { user } = useUser();
@@ -40,6 +41,32 @@ const Settings = () => {
 
   const [diagnostics, setDiagnostics] = useState<any>(null);
   const [diagLoading, setDiagLoading] = useState(false);
+
+  // Subscription Plan State
+  const [currentPlan, setCurrentPlan] = useState<string>("trial");
+  const [expiresAt, setExpiresAt] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const p = await getCurrentPlan();
+      const e = await getPlanExpiresAt();
+      setCurrentPlan(p || "trial");
+      setExpiresAt(e);
+    })();
+  }, []);
+
+  const daysLeft = expiresAt
+    ? Math.max(0, Math.ceil((new Date(expiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    : 0;
+
+  const planBadgeColor = daysLeft <= 0 ? colors.status.error : daysLeft <= 3 ? "#F59E0B" : colors.accent[500];
+
+  const upgradeLabel = () => {
+    if (daysLeft <= 0) return "Renew Plan";
+    if (currentPlan === "trial") return "Upgrade to Basic";
+    if (currentPlan === "basic") return "Upgrade to Fleet";
+    return "Renew Plan"; // fleet
+  };
 
   const fetchDiagnostics = useCallback(async () => {
     if (deviceId == null) return;
@@ -89,10 +116,8 @@ const Settings = () => {
   );
 
   return (
-    <SafeAreaView className={`flex-1 ${isDark ? "bg-slate-900" : "bg-surface-light"}`}>
-      <ScrollView className="px-5" contentContainerStyle={{ paddingBottom: 120, paddingTop: 10 }}>
-        <Text className={`text-2xl font-JakartaBold my-5 ${isDark ? "text-slate-100" : "text-slate-900"}`}>Settings</Text>
-
+    <View className={`flex-1 ${isDark ? "bg-slate-900" : "bg-surface-light"}`}>
+      <ScrollView className="px-5" contentContainerStyle={{ paddingBottom: 120, paddingTop: 20 }}>
         {/* ════════ APPEARANCE ════════ */}
         <View className={`rounded-2xl shadow-sm border px-5 py-4 mb-4 ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200"}`}>
           <SectionHeader
@@ -170,7 +195,7 @@ const Settings = () => {
               <TouchableOpacity
                 onPress={fetchDiagnostics}
                 disabled={diagLoading}
-                className={`flex-row items-center py-3 px-4 rounded-xl border ${isDark ? "bg-slate-700 border-slate-600" : "bg-accent-100 border-accent-400"}`}
+                className={`flex-row items-center py-3 px-4 rounded-xl border mt-3 ${isDark ? "bg-slate-700 border-slate-600" : "bg-accent-100 border-accent-400"}`}
               >
                 {diagLoading ? (
                   <ActivityIndicator size="small" color={colors.accent[400]} />
@@ -205,8 +230,42 @@ const Settings = () => {
                   )}
                 </View>
               )}
+              
+              <TouchableOpacity
+                onPress={() => router.push("/(root)/(tabs)/alerts")}
+                className={`flex-row items-center py-3 px-4 rounded-xl border mt-3 ${isDark ? "bg-slate-700 border-slate-600" : "bg-slate-100 border-slate-300"}`}
+              >
+                <Ionicons name="notifications" size={18} color={isDark ? "#94A3B8" : "#475569"} />
+                <Text className={`text-sm font-JakartaBold ml-2 ${isDark ? "text-slate-300" : "text-slate-700"}`}>Configure Alerts</Text>
+              </TouchableOpacity>
             </>
           )}
+        </View>
+
+        {/* ════════ SUBSCRIPTION & BILLING ════════ */}
+        <View className={`rounded-2xl shadow-sm border px-5 py-4 mb-4 ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200"}`}>
+          <SectionHeader icon={<Ionicons name="card" size={22} color={colors.accent[400]} />} title="Billing & Plan" />
+          <View style={{ padding: 14, borderRadius: 14, borderWidth: 1, backgroundColor: isDark ? colors.surface.light : colors.accent[50], borderColor: colors.accent[200] }}>
+            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 6 }}>
+              <Ionicons name="cube-outline" size={18} color={planBadgeColor} style={{ marginRight: 6 }} />
+              <Text style={{ fontSize: 12, fontFamily: "Jakarta-Medium", flex: 1, color: colors.text.secondary }}>Current Plan</Text>
+              <View style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 20, borderWidth: 1, backgroundColor: planBadgeColor + "20", borderColor: planBadgeColor }}>
+                <Text style={{ fontSize: 11, fontFamily: "Jakarta-Bold", color: planBadgeColor }}>
+                  {daysLeft <= 0 ? "Expired" : `${daysLeft}d left`}
+                </Text>
+              </View>
+            </View>
+            <Text style={{ fontSize: 18, fontFamily: "Jakarta-Bold", marginBottom: 12, color: colors.text.primary }}>
+              {getPlan(currentPlan as PlanId).name}
+            </Text>
+            <TouchableOpacity
+              style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 10, borderRadius: 10, backgroundColor: planBadgeColor }}
+              onPress={() => router.push("/(onboarding)/billing")}
+            >
+              <Ionicons name="arrow-up-circle-outline" size={16} color="#fff" style={{ marginRight: 6 }} />
+              <Text style={{ color: "#fff", fontFamily: "Jakarta-Bold", fontSize: 14 }}>{upgradeLabel()}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* ════════ ACCOUNT ════════ */}
@@ -250,7 +309,7 @@ const Settings = () => {
       {/* Shared modals */}
       <AlertDialog dialog={dialog} onClose={hideDialog} isDark={isDark} />
       <ConfirmModal modal={confirmModal} isDark={isDark} onClose={hideConfirm} />
-    </SafeAreaView>
+    </View>
   );
 };
 

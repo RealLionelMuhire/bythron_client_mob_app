@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { router } from "expo-router";
 import { useAuth } from "@clerk/clerk-expo";
 import {
   View,
@@ -439,6 +440,24 @@ const Tracking = () => {
             <Ionicons name="location" size={16} color={colors.accent[400]} />
             <Text style={styles.addressText} numberOfLines={1}>{streetName}</Text>
           </View>
+
+          {/* Contextual Device Actions */}
+          <View style={styles.actionsRow}>
+            <TouchableOpacity style={styles.actionBtn} onPress={() => router.push("/(root)/(tabs)/history")}>
+              <Ionicons name="time-outline" size={18} color={colors.accent[400]} />
+              <Text style={styles.actionBtnText}>History</Text>
+            </TouchableOpacity>
+            <View style={[styles.actionDivider, { backgroundColor: colors.surface.border }]} />
+            <TouchableOpacity style={styles.actionBtn} onPress={() => router.push("/(root)/(tabs)/command")}>
+              <MaterialCommunityIcons name="swap-horizontal" size={18} color={colors.accent[400]} />
+              <Text style={styles.actionBtnText}>Command</Text>
+            </TouchableOpacity>
+            <View style={[styles.actionDivider, { backgroundColor: colors.surface.border }]} />
+            <TouchableOpacity style={styles.actionBtn} onPress={() => router.push("/(root)/(tabs)/alerts")}>
+              <Ionicons name="settings-outline" size={18} color={colors.accent[400]} />
+              <Text style={styles.actionBtnText}>Alerts</Text>
+            </TouchableOpacity>
+          </View>
         </Animated.View>
 
         {/* Pill handle + chevron at base of panel */}
@@ -762,6 +781,34 @@ function createTrackingStyles(colors: ReturnType<typeof getThemeColors>) {
     fontSize: 11,
     marginLeft: 6,
     lineHeight: 15,
+  },
+  actionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
+    marginHorizontal: 12,
+    marginBottom: 8,
+    marginTop: 4,
+    paddingVertical: 8,
+    backgroundColor: colors.surface.border + "40",
+    borderRadius: 10,
+  },
+  actionBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 4,
+  },
+  actionBtnText: {
+    fontSize: 12,
+    fontFamily: "Jakarta-SemiBold",
+    color: colors.text.primary,
+    marginLeft: 6,
+  },
+  actionDivider: {
+    width: 1,
+    height: "100%",
   },
   map: {
     flex: 1,

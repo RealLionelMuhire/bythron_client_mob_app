@@ -1,60 +1,95 @@
-import React, { useEffect, useRef, useState } from "react";
+/**
+ * components/SideMenu.tsx
+ *
+ * A smooth slide-in side drawer with full navigation links,
+ * user profile, plan status, and sign-out.
+ */
+
+import React, { useEffect, useRef } from "react";
 import {
   Animated,
   Dimensions,
   Image,
   Modal,
+  Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   View,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { useAuth, useUser } from "@clerk/clerk-expo";
-import { getThemeColors } from "@/constants/theme";
-import { useColorScheme } from "nativewind";
-import { getCurrentPlan, getPlanExpiresAt, clearOnboardingState } from "@/lib/onboarding";
-import { getPlan, PlanId } from "@/constants/plans";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { icons } from "@/constants";
+import { useUser, useAuth } from "@clerk/clerk-expo";
+import { useColorScheme } from "nativewind";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const { width } = Dimensions.get("window");
-const DRAWER_WIDTH = width * 0.78;
+import { getThemeColors } from "@/constants/theme";
+import { clearOnboardingState } from "@/lib/onboarding";
+
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const DRAWER_WIDTH = SCREEN_WIDTH * 0.78;
 
 interface SideMenuProps {
   isVisible: boolean;
   onDismiss: () => void;
-  onShowUpgrade: () => void;
-  onShowBilling: () => void;
 }
 
-export default function SideMenu({ isVisible, onDismiss, onShowUpgrade, onShowBilling }: SideMenuProps) {
+interface NavItemProps {
+  icon: React.ReactNode;
+  label: string;
+  onPress: () => void;
+  isDark: boolean;
+  colors: ReturnType<typeof getThemeColors>;
+  badge?: number;
+}
+
+const NavItem = ({ icon, label, onPress, isDark, colors, badge }: NavItemProps) => (
+  <TouchableOpacity
+    onPress={onPress}
+    style={[
+      styles.navItem,
+      { backgroundColor: isDark ? "transparent" : "transparent" },
+    ]}
+    activeOpacity={0.65}
+  >
+    <View style={styles.navItemIcon}>{icon}</View>
+    <Text style={[styles.navItemLabel, { color: isDark ? "#E2E8F0" : "#1E293B" }]}>
+      {label}
+    </Text>
+    {badge != null && badge > 0 && (
+      <View style={[styles.badge, { backgroundColor: colors.status.error }]}>
+        <Text style={styles.badgeText}>{badge > 99 ? "99+" : badge}</Text>
+      </View>
+    )}
+    <Ionicons name="chevron-forward" size={16} color={isDark ? "#64748B" : "#94A3B8"} />
+  </TouchableOpacity>
+);
+
+const Divider = ({ isDark }: { isDark: boolean }) => (
+  <View style={[styles.divider, { backgroundColor: isDark ? "#1E293B" : "#E2E8F0" }]} />
+);
+
+const SectionLabel = ({ label, isDark }: { label: string; isDark: boolean }) => (
+  <Text style={[styles.sectionLabel, { color: isDark ? "#64748B" : "#94A3B8" }]}>
+    {label.toUpperCase()}
+  </Text>
+);
+
+const SideMenu: React.FC<SideMenuProps> = ({ isVisible, onDismiss }) => {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === "dark";
   const colors = getThemeColors(isDark ? "dark" : "light");
+  const insets = useSafeAreaInsets();
+  const { user, isLoaded } = useUser();
   const { signOut } = useAuth();
-  const { user } = useUser();
-
-  const [currentPlan, setCurrentPlan] = useState<string>("trial");
-  const [expiresAt, setExpiresAt] = useState<string | null>(null);
-  const [modalVisible, setModalVisible] = useState(false);
 
   // Slide animation
   const slideAnim = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const overlayAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (isVisible) {
-      setModalVisible(true);
-      // Load plan info
-      (async () => {
-        const p = await getCurrentPlan();
-        const e = await getPlanExpiresAt();
-        setCurrentPlan(p || "trial");
-        setExpiresAt(e);
-      })();
-      // Slide in + fade backdrop
       Animated.parallel([
         Animated.spring(slideAnim, {
           toValue: 0,
@@ -62,308 +97,293 @@ export default function SideMenu({ isVisible, onDismiss, onShowUpgrade, onShowBi
           tension: 65,
           friction: 11,
         }),
-        Animated.timing(fadeAnim, {
+        Animated.timing(overlayAnim, {
           toValue: 1,
           duration: 220,
           useNativeDriver: true,
         }),
       ]).start();
     } else {
-      // Slide out + fade backdrop
       Animated.parallel([
-        Animated.timing(slideAnim, {
+        Animated.spring(slideAnim, {
           toValue: -DRAWER_WIDTH,
-          duration: 240,
           useNativeDriver: true,
+          tension: 65,
+          friction: 11,
         }),
-        Animated.timing(fadeAnim, {
+        Animated.timing(overlayAnim, {
           toValue: 0,
-          duration: 200,
+          duration: 180,
           useNativeDriver: true,
         }),
-      ]).start(() => setModalVisible(false));
+      ]).start();
     }
   }, [isVisible]);
 
-  const daysLeft = expiresAt
-    ? Math.max(0, Math.ceil((new Date(expiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
-    : 0;
-
-  const upgradeLabel = () => {
-    if (daysLeft <= 0) return "Renew Plan";
-    if (currentPlan === "trial") return "Upgrade to Basic";
-    if (currentPlan === "basic") return "Upgrade to Fleet";
-    return "Renew Plan"; // fleet
+  const navigate = (path: string) => {
+    onDismiss();
+    setTimeout(() => router.push(path as any), 100);
   };
 
   const handleSignOut = async () => {
     onDismiss();
-    await clearOnboardingState();
-    await signOut();
-    router.replace("/(auth)/sign-in" as any);
+    setTimeout(async () => {
+      await clearOnboardingState();
+      await signOut();
+      router.replace("/(auth)/sign-in");
+    }, 200);
   };
 
-  const planBadgeColor =
-    daysLeft <= 0 ? colors.status.error : daysLeft <= 3 ? "#F59E0B" : colors.accent[500];
+  const bg = isDark ? "#0F172A" : "#FFFFFF";
+  const iconColor = colors.accent[400];
 
   return (
     <Modal
-      visible={modalVisible}
+      visible={isVisible}
       transparent
       animationType="none"
       onRequestClose={onDismiss}
+      statusBarTranslucent
     >
-      <View style={styles.overlay}>
-        {/* Dimmed backdrop — tap to close */}
-        <TouchableWithoutFeedback onPress={onDismiss}>
-          <Animated.View style={[styles.backdrop, { opacity: fadeAnim }]} />
-        </TouchableWithoutFeedback>
+      {/* Backdrop */}
+      <Animated.View
+        style={[styles.overlay, { opacity: overlayAnim }]}
+      >
+        <Pressable style={StyleSheet.absoluteFill} onPress={onDismiss} />
+      </Animated.View>
 
-        {/* Sliding drawer */}
-        <Animated.View
-          style={[
-            styles.drawer,
-            { backgroundColor: isDark ? colors.surface.card : "#FFFFFF", transform: [{ translateX: slideAnim }] },
-          ]}
-        >
-          {/* ── User header ─────────────────────────────────────────────── */}
-          <View style={[styles.userHeader, { backgroundColor: colors.accent[500] }]}>
-            <View style={styles.userAvatar}>
+      {/* Drawer panel */}
+      <Animated.View
+        style={[
+          styles.drawer,
+          {
+            width: DRAWER_WIDTH,
+            backgroundColor: bg,
+            transform: [{ translateX: slideAnim }],
+            paddingTop: insets.top,
+            paddingBottom: insets.bottom + 16,
+            shadowColor: "#000",
+            shadowOffset: { width: 4, height: 0 },
+            shadowOpacity: isDark ? 0.5 : 0.15,
+            shadowRadius: 16,
+            elevation: 24,
+          },
+        ]}
+      >
+        <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
+          {/* ── User Profile Header ── */}
+          <View style={[styles.profileHeader, { backgroundColor: isDark ? "#1E293B" : colors.accent[50] }]}>
+            <View style={[styles.avatarWrap, { borderColor: colors.accent[300], backgroundColor: isDark ? "#334155" : colors.accent[100] }]}>
               {user?.imageUrl ? (
-                <Image source={{ uri: user.imageUrl }} style={styles.avatarImg} />
+                <Image source={{ uri: user.imageUrl }} style={styles.avatar} />
               ) : (
-                <View style={[styles.avatarPlaceholder, { backgroundColor: colors.accent[400] }]}>
-                  <Ionicons name="person" size={28} color="#fff" />
-                </View>
+                <Ionicons name="person" size={30} color={iconColor} />
               )}
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.userName} numberOfLines={1}>
+              <Text style={[styles.profileName, { color: isDark ? "#F1F5F9" : "#0F172A" }]} numberOfLines={1}>
                 {user?.fullName || user?.firstName || "User"}
               </Text>
-              <Text style={styles.userEmail} numberOfLines={1}>
+              <Text style={[styles.profileEmail, { color: isDark ? "#94A3B8" : "#64748B" }]} numberOfLines={1}>
                 {user?.primaryEmailAddress?.emailAddress || ""}
               </Text>
             </View>
-            <TouchableOpacity onPress={onDismiss} style={styles.closeBtn}>
-              <Ionicons name="close" size={24} color="#fff" />
+          </View>
+
+          <View style={styles.navList}>
+            {/* ── Main Navigation ── */}
+            <SectionLabel label="Navigation" isDark={isDark} />
+
+            <NavItem
+              icon={<Ionicons name="home" size={20} color={iconColor} />}
+              label="Dashboard"
+              onPress={() => navigate("/(root)/(tabs)/home")}
+              isDark={isDark}
+              colors={colors}
+            />
+            <NavItem
+              icon={<MaterialCommunityIcons name="map-marker-radius" size={20} color={iconColor} />}
+              label="Live Tracking"
+              onPress={() => navigate("/(root)/(tabs)/tracking")}
+              isDark={isDark}
+              colors={colors}
+            />
+            <NavItem
+              icon={<Ionicons name="time" size={20} color={iconColor} />}
+              label="History"
+              onPress={() => navigate("/(root)/(tabs)/history")}
+              isDark={isDark}
+              colors={colors}
+            />
+            <NavItem
+              icon={<MaterialCommunityIcons name="console-line" size={20} color={iconColor} />}
+              label="Commands"
+              onPress={() => navigate("/(root)/(tabs)/command")}
+              isDark={isDark}
+              colors={colors}
+            />
+            <NavItem
+              icon={<Ionicons name="notifications" size={20} color={iconColor} />}
+              label="Alerts Config"
+              onPress={() => navigate("/(root)/(tabs)/alerts")}
+              isDark={isDark}
+              colors={colors}
+            />
+            <NavItem
+              icon={<Ionicons name="car" size={20} color={iconColor} />}
+              label="Vehicles"
+              onPress={() => navigate("/(root)/(tabs)/vehicles")}
+              isDark={isDark}
+              colors={colors}
+            />
+
+            <Divider isDark={isDark} />
+
+            {/* ── Account ── */}
+            <SectionLabel label="Account" isDark={isDark} />
+
+            <NavItem
+              icon={<Ionicons name="card" size={20} color={iconColor} />}
+              label="Billing & Plan"
+              onPress={() => navigate("/(onboarding)/billing")}
+              isDark={isDark}
+              colors={colors}
+            />
+            <NavItem
+              icon={<Ionicons name="settings-outline" size={20} color={iconColor} />}
+              label="Settings"
+              onPress={() => navigate("/(root)/(tabs)/settings")}
+              isDark={isDark}
+              colors={colors}
+            />
+
+            <Divider isDark={isDark} />
+
+            {/* ── Sign Out ── */}
+            <TouchableOpacity style={styles.signOutBtn} onPress={handleSignOut} activeOpacity={0.7}>
+              <Ionicons name="log-out-outline" size={20} color={colors.status.error} />
+              <Text style={[styles.signOutText, { color: colors.status.error }]}>Sign Out</Text>
             </TouchableOpacity>
           </View>
+        </ScrollView>
 
-          {/* ── Menu items ─────────────────────────────────────────────── */}
-          <View style={styles.content}>
-            <MenuItem
-              icon="person-outline"
-              title="Profile"
-              onPress={() => { onDismiss(); router.push("/(root)/(tabs)/settings" as any); }}
-              colors={colors}
-            />
-            <MenuItem
-              icon="car-outline"
-              title="My Vehicles"
-              onPress={() => { onDismiss(); router.push("/(root)/(tabs)/vehicles" as any); }}
-              colors={colors}
-            />
-
-            <View style={[styles.divider, { backgroundColor: colors.surface.border }]} />
-
-            {/* Plan card */}
-            <View style={[styles.planCard, { backgroundColor: isDark ? colors.surface.light : colors.accent[50], borderColor: colors.accent[200] }]}>
-              <View style={styles.planRow}>
-                <Ionicons name="cube-outline" size={18} color={planBadgeColor} style={{ marginRight: 6 }} />
-                <Text style={[styles.planLabel, { color: colors.text.secondary }]}>Current Plan</Text>
-                <View style={[styles.planBadge, { backgroundColor: planBadgeColor + "20", borderColor: planBadgeColor }]}>
-                  <Text style={[styles.planBadgeText, { color: planBadgeColor }]}>
-                    {daysLeft <= 0 ? "Expired" : `${daysLeft}d left`}
-                  </Text>
-                </View>
-              </View>
-              <Text style={[styles.planName, { color: colors.text.primary }]}>
-                {getPlan(currentPlan as PlanId).name}
-              </Text>
-              <TouchableOpacity
-                style={[styles.upgradeBtn, { backgroundColor: planBadgeColor }]}
-                onPress={() => { onDismiss(); onShowUpgrade(); }}
-              >
-                <Ionicons name="arrow-up-circle-outline" size={16} color="#fff" style={{ marginRight: 6 }} />
-                <Text style={styles.upgradeBtnText}>{upgradeLabel()}</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={[styles.divider, { backgroundColor: colors.surface.border }]} />
-
-            <MenuItem
-              icon="card-outline"
-              title="Billing & Payments"
-              onPress={() => { onDismiss(); onShowBilling(); }}
-              colors={colors}
-            />
-            <MenuItem
-              icon="notifications-outline"
-              title="Notifications"
-              onPress={() => { onDismiss(); router.push("/(root)/(tabs)/alarm-log" as any); }}
-              colors={colors}
-            />
-            <MenuItem
-              icon="help-circle-outline"
-              title="Help & Support"
-              onPress={() => { onDismiss(); }}
-              colors={colors}
-            />
-
-            <View style={[styles.divider, { backgroundColor: colors.surface.border }]} />
-
-            <MenuItem
-              icon="log-out-outline"
-              title="Sign Out"
-              onPress={handleSignOut}
-              colors={colors}
-              textColor={colors.status.error}
-            />
-          </View>
-        </Animated.View>
-      </View>
+        {/* App version at bottom */}
+        <Text style={[styles.version, { color: isDark ? "#334155" : "#CBD5E1" }]}>
+          BYThron Track IQ v1.0.0
+        </Text>
+      </Animated.View>
     </Modal>
   );
-}
-
-function MenuItem({ icon, title, onPress, colors, textColor }: any) {
-  return (
-    <TouchableOpacity style={styles.menuItem} onPress={onPress} activeOpacity={0.7}>
-      <Ionicons name={icon} size={22} color={textColor || colors.text.secondary} style={styles.menuIcon} />
-      <Text style={[styles.menuText, { color: textColor || colors.text.primary }]}>{title}</Text>
-      {!textColor && (
-        <Ionicons name="chevron-forward" size={16} color={colors.text.muted} style={{ marginLeft: "auto" }} />
-      )}
-    </TouchableOpacity>
-  );
-}
+};
 
 const styles = StyleSheet.create({
   overlay: {
-    flex: 1,
-    flexDirection: "row",
-  },
-  backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.55)",
+    backgroundColor: "rgba(0,0,0,0.52)",
   },
   drawer: {
-    width: DRAWER_WIDTH,
-    height: "100%",
-    elevation: 20,
-    shadowColor: "#000",
-    shadowOpacity: 0.35,
-    shadowOffset: { width: 4, height: 0 },
-    shadowRadius: 12,
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
   },
-  // ── User header
-  userHeader: {
+  profileHeader: {
     flexDirection: "row",
     alignItems: "center",
-    paddingTop: 56,
-    paddingBottom: 20,
     paddingHorizontal: 20,
-    gap: 12,
+    paddingVertical: 20,
+    gap: 14,
   },
-  userAvatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    overflow: "hidden",
+  avatarWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.4)",
-  },
-  avatarImg: {
-    width: "100%",
-    height: "100%",
-  },
-  avatarPlaceholder: {
-    width: "100%",
-    height: "100%",
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
   },
-  userName: {
+  avatar: {
+    width: "100%",
+    height: "100%",
+  },
+  profileName: {
     fontSize: 16,
     fontFamily: "Jakarta-Bold",
-    color: "#fff",
+    marginBottom: 2,
   },
-  userEmail: {
+  profileEmail: {
     fontSize: 12,
     fontFamily: "Jakarta-Medium",
-    color: "rgba(255,255,255,0.75)",
-    marginTop: 2,
   },
-  closeBtn: {
-    padding: 4,
+  navList: {
+    paddingHorizontal: 12,
+    paddingTop: 12,
   },
-  // ── Content
-  content: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 8,
+  sectionLabel: {
+    fontSize: 11,
+    fontFamily: "Jakarta-SemiBold",
+    letterSpacing: 1,
+    paddingHorizontal: 8,
+    marginBottom: 4,
+    marginTop: 8,
   },
-  menuItem: {
+  navItem: {
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 13,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    marginBottom: 2,
+    gap: 12,
   },
-  menuIcon: {
-    marginRight: 14,
-    width: 24,
+  navItemIcon: {
+    width: 28,
+    alignItems: "center",
   },
-  menuText: {
+  navItemLabel: {
+    flex: 1,
     fontSize: 15,
     fontFamily: "Jakarta-SemiBold",
-    flex: 1,
+  },
+  badge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 5,
+    marginRight: 4,
+  },
+  badgeText: {
+    color: "#fff",
+    fontSize: 10,
+    fontFamily: "Jakarta-Bold",
   },
   divider: {
     height: 1,
-    marginVertical: 8,
+    marginVertical: 10,
+    marginHorizontal: 8,
   },
-  // ── Plan card
-  planCard: {
-    padding: 14,
-    borderRadius: 14,
-    borderWidth: 1,
-    marginVertical: 4,
-  },
-  planRow: {
+  signOutBtn: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 6,
+    gap: 12,
+    paddingVertical: 13,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    marginTop: 4,
   },
-  planLabel: {
-    fontSize: 12,
-    fontFamily: "Jakarta-Medium",
-    flex: 1,
+  signOutText: {
+    fontSize: 15,
+    fontFamily: "Jakarta-SemiBold",
   },
-  planBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  planBadgeText: {
+  version: {
+    textAlign: "center",
     fontSize: 11,
-    fontFamily: "Jakarta-Bold",
-  },
-  planName: {
-    fontSize: 18,
-    fontFamily: "Jakarta-Bold",
-    marginBottom: 12,
-  },
-  upgradeBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-  upgradeBtnText: {
-    color: "#fff",
-    fontFamily: "Jakarta-Bold",
-    fontSize: 14,
+    fontFamily: "Jakarta-Medium",
+    marginTop: 8,
   },
 });
+
+export default SideMenu;

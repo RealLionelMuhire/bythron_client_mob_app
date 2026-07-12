@@ -14,7 +14,7 @@
 
 import { useEffect, useRef } from "react";
 import { View } from "react-native";
-import { Slot } from "expo-router";
+import { Stack } from "expo-router";
 import { useUser, useAuth } from "@clerk/clerk-expo";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -120,7 +120,10 @@ export default function RootLayout() {
 
   return (
     <View style={{ flex: 1 }}>
-      <Slot />
+      <Stack>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="alarm-log" options={{ title: "Alarm Log", presentation: "modal" }} />
+      </Stack>
       {/* Global alarm banner — overlays all tabs so alarms are visible app-wide */}
       <AlarmBanner
         alarm={globalBanner as any}

@@ -8,7 +8,7 @@
  * - On success → saves onboarding_step=4 → navigates to profile-save
  */
 
-import { useSignUp } from "@clerk/clerk-expo";
+import { useSignUp, useSignIn } from "@clerk/clerk-expo";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -31,9 +31,14 @@ import { setOnboardingStep } from "@/lib/onboarding";
 const RESEND_TIMEOUT = 30; // seconds
 
 export default function OtpVerify() {
-  const { isLoaded, signUp, setActive } = useSignUp();
+  const { isLoaded: isSignUpLoaded, signUp, setActive: setSignUpActive } = useSignUp();
+  const { isLoaded: isSignInLoaded, signIn, setActive: setSignInActive } = useSignIn();
+
   const params = useLocalSearchParams();
   const verifyType = (params.type as string) || "email";
+  const flow = (params.flow as string) || "signUp"; // "signUp", "signIn", or "mfa"
+
+  const isLoaded = (flow === "signIn" || flow === "mfa") ? isSignInLoaded : isSignUpLoaded;
 
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === "dark";
@@ -77,16 +82,34 @@ export default function OtpVerify() {
     setError(null);
 
     try {
-      const result = await signUp!.attemptEmailAddressVerification({ code: otpCode });
-
-      if (result.status === "complete") {
-        // Activate the session
-        await setActive!({ session: result.createdSessionId });
-        // Mark onboarding at step 4 — profile save is next
-        await setOnboardingStep(4);
-        router.replace("/(onboarding)/profile-save" as any);
+      if (flow === "mfa") {
+        // MFA second factor (TOTP or Email Code)
+        const strategy = verifyType === "email" ? "email_code" : "totp";
+        const result = await signIn!.attemptSecondFactor({ strategy, code: otpCode });
+        if (result.status === "complete") {
+          await setSignInActive!({ session: result.createdSessionId });
+          router.replace("/");
+        } else {
+          setError("Verification incomplete. Please try again.");
+        }
+      } else if (flow === "signIn") {
+        const result = await signIn!.attemptFirstFactor({ strategy: "email_code", code: otpCode });
+        if (result.status === "complete") {
+          await setSignInActive!({ session: result.createdSessionId });
+          // The global index.tsx will mount, handle the backend sync, and route correctly.
+          router.replace("/");
+        } else {
+          setError("Verification incomplete. Please try again.");
+        }
       } else {
-        setError("Verification incomplete. Please try again.");
+        const result = await signUp!.attemptEmailAddressVerification({ code: otpCode });
+        if (result.status === "complete") {
+          await setSignUpActive!({ session: result.createdSessionId });
+          await setOnboardingStep(4);
+          router.replace("/(onboarding)/profile-save" as any);
+        } else {
+          setError("Verification incomplete. Please try again.");
+        }
       }
     } catch (err: any) {
       const msg =
@@ -100,9 +123,22 @@ export default function OtpVerify() {
   };
 
   const onResend = async () => {
-    if (!isLoaded) return;
+    if (!isLoaded || (flow === "mfa" && verifyType === "totp")) return; // TOTP codes can't be resent
     try {
-      await signUp!.prepareEmailAddressVerification({ strategy: "email_code" });
+      if (flow === "mfa" && verifyType === "email") {
+        const secondFactors = signIn!.supportedSecondFactors ?? [];
+        const emailFactor = secondFactors.find((f: any) => f.strategy === "email_code");
+        if (emailFactor) {
+          await signIn!.prepareSecondFactor({ strategy: "email_code", emailAddressId: emailFactor.emailAddressId });
+        }
+      } else if (flow === "signIn") {
+        const emailFactor = signIn!.supportedFirstFactors?.find((f: any) => f.strategy === "email_code");
+        if (emailFactor) {
+          await signIn!.prepareFirstFactor({ strategy: "email_code", emailAddressId: emailFactor.emailAddressId });
+        }
+      } else {
+        await signUp!.prepareEmailAddressVerification({ strategy: "email_code" });
+      }
       setError(null);
       setOtpCode("");
       startCountdown();
@@ -137,13 +173,16 @@ export default function OtpVerify() {
               <Text style={styles.iconEmoji}>✉️</Text>
             </View>
             <Text style={[styles.title, { color: colors.text.primary }]}>
-              Verify your email
+              {flow === "mfa" && verifyType === "totp" ? "Authenticator Code" : "Verify your email"}
             </Text>
             <Text style={[styles.subtitle, { color: colors.text.muted }]}>
-              Enter the 6-digit code sent to{"\n"}
-              <Text style={{ color: colors.accent[500], fontFamily: "Jakarta-SemiBold" }}>
-                your email
-              </Text>
+              {flow === "mfa" && verifyType === "totp"
+                ? "Enter the 6-digit code from your\nauthenticator app"
+                : <>Enter the 6-digit code sent to{"\n"}
+                    <Text style={{ color: colors.accent[500], fontFamily: "Jakarta-SemiBold" }}>
+                      your email
+                    </Text>
+                  </>}
             </Text>
           </View>
 
@@ -202,23 +241,25 @@ export default function OtpVerify() {
             className="mt-4"
           />
 
-          {/* Resend */}
-          <View style={styles.resendRow}>
-            {canResend ? (
-              <TouchableOpacity onPress={onResend}>
-                <Text style={[styles.resendLink, { color: colors.accent[500] }]}>
-                  Resend code
+          {/* Resend — only shown for email flows, not for TOTP */}
+          {!(flow === "mfa" && verifyType === "totp") && (
+            <View style={styles.resendRow}>
+              {canResend ? (
+                <TouchableOpacity onPress={onResend}>
+                  <Text style={[styles.resendLink, { color: colors.accent[500] }]}>
+                    Resend code
+                  </Text>
+                </TouchableOpacity>
+              ) : (
+                <Text style={[styles.timerText, { color: colors.text.muted }]}>
+                  Resend in{" "}
+                  <Text style={{ fontFamily: "Jakarta-SemiBold", color: colors.text.primary }}>
+                    {timer}s
+                  </Text>
                 </Text>
-              </TouchableOpacity>
-            ) : (
-              <Text style={[styles.timerText, { color: colors.text.muted }]}>
-                Resend in{" "}
-                <Text style={{ fontFamily: "Jakarta-SemiBold", color: colors.text.primary }}>
-                  {timer}s
-                </Text>
-              </Text>
-            )}
-          </View>
+              )}
+            </View>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

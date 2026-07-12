@@ -2,6 +2,7 @@ module.exports = {
   expo: {
     name: "Track IQ",
     slug: "track-iq",
+    owner: "muhire01",
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/images/icon.png",

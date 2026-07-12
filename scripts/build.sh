@@ -1,9 +1,9 @@
 #!/bin/bash
 # Build a release APK from the project root.
-# Usage:  ./scripts/build.sh [--clean]
+# Usage:  ./scripts/build.sh [--clean | --prebuild]
 #
-# --clean  runs expo prebuild --clean first (full native regen)
-#          WARNING: wipes the android/ folder
+# --clean     runs expo prebuild --clean first (full native regen)
+# --prebuild  runs expo prebuild incrementally (safe for plugin changes)
 
 set -e
 
@@ -12,7 +12,20 @@ PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 cd "$PROJECT_DIR"
 
-# ── Optional: re-run prebuild before building ─────────────────────────────
+# ── Auto-create android/local.properties if missing ────────────────────────
+# This file is wiped by "prebuild --clean" — we rebuild it from ANDROID_HOME.
+LOCAL_PROPS="$PROJECT_DIR/android/local.properties"
+if [ ! -f "$LOCAL_PROPS" ]; then
+  SDK_DIR="${ANDROID_HOME:-$HOME/Android/Sdk}"
+  if [ -d "$SDK_DIR" ]; then
+    echo "sdk.dir=$SDK_DIR" > "$LOCAL_PROPS"
+    echo "ℹ️  Created android/local.properties → $SDK_DIR"
+  else
+    echo "❌  android/local.properties is missing and ANDROID_HOME is not set."
+    echo "    Run ./scripts/setup-android-sdk.sh first."
+    exit 1
+  fi
+fi
 if [[ "$1" == "--clean" ]]; then
   echo "⚙️  Running expo prebuild --clean ..."
   npx expo prebuild --platform android --clean
