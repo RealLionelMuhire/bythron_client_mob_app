@@ -89,23 +89,19 @@ const SignIn = () => {
           setError(`Additional verification required. Code: ${result.status}`);
         }
       } else if (result.status === "needs_second_factor") {
-        // Clerk requires a second factor — check which strategy is available
-        const secondFactors = result.supportedSecondFactors ?? [];
-        const emailFactor = secondFactors.find((f: any) => f.strategy === "email_code");
-        const totpFactor  = secondFactors.find((f: any) => f.strategy === "totp");
-
+        console.log("CLERK DEMANDED 2FA. Supported factors:", JSON.stringify(result.supportedSecondFactors, null, 2));
+        
+        const emailFactor = result.supportedSecondFactors?.find((f: any) => f.strategy === "email_code");
         if (emailFactor) {
-          // Email code as second factor — prepare it first
+          // Prepare the second factor (this tells Clerk to actually send the email with the code)
           await signIn.prepareSecondFactor({
             strategy: "email_code",
-            emailAddressId: emailFactor.emailAddressId,
           });
+          // Redirect to the OTP screen, telling it we are in the "mfa" flow
           router.push({ pathname: "/(auth)/otp-verify", params: { type: "email", flow: "mfa" } } as any);
-        } else if (totpFactor) {
-          // TOTP authenticator app — no preparation needed
-          router.push({ pathname: "/(auth)/otp-verify", params: { type: "totp", flow: "mfa" } } as any);
         } else {
-          setError("A second verification step is required but no supported method was found.");
+          const factors = result.supportedSecondFactors?.map((f: any) => f.strategy).join(", ") || "Unknown";
+          setError(`Clerk is forcing Two-Factor Auth (${factors}). Please check Clerk Dashboard -> Multi-factor settings.`);
         }
       } else {
         setError(`Additional verification required. Code: ${result.status}`);

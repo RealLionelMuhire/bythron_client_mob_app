@@ -14,7 +14,7 @@
  *      d. Server unreachable → fall back to local SecureStore
  */
 
-import { useAuth } from "@clerk/clerk-expo";
+import { useAuth, useUser } from "@clerk/clerk-expo";
 import { Redirect } from "expo-router";
 import { useEffect, useState } from "react";
 
@@ -33,6 +33,7 @@ type RoutingState = "loading" | "home" | "onboarding";
 
 export default function Index() {
   const { isLoaded, isSignedIn, getToken } = useAuth();
+  const { user } = useUser();
   const [state, setState]           = useState<RoutingState>("loading");
   const [resumeRoute, setResumeRoute] = useState<string>("/(onboarding)/plan");
 
@@ -46,6 +47,28 @@ export default function Index() {
     (async () => {
       try {
         setAuthTokenGetter(getToken);
+
+        // ── Step 0: Ensure User is Synced to Database ──────────────────────
+        if (user) {
+          try {
+            const safeName =
+              user.fullName ||
+              [user.firstName, user.lastName].filter(Boolean).join(" ") ||
+              user.primaryEmailAddress?.emailAddress?.split("@")[0] ||
+              "Unknown";
+
+            await fetchAPI("/api/auth/sync", {
+              method: "POST",
+              body: JSON.stringify({
+                clerk_user_id: user.id,
+                email: user.primaryEmailAddress?.emailAddress,
+                name: safeName,
+              }),
+            });
+          } catch (syncErr) {
+            console.warn("[Index] User sync failed, but proceeding:", syncErr);
+          }
+        }
 
         // ── Step 1: Check user profile ─────────────────────────────────────
         const userProfile = await fetchAPI("/api/auth/me");
@@ -103,7 +126,7 @@ export default function Index() {
         }
       }
     })();
-  }, [isLoaded, isSignedIn]);
+  }, [isLoaded, isSignedIn, user]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
